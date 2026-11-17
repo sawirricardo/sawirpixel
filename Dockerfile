@@ -23,6 +23,10 @@ FROM node:24-alpine AS assets
 WORKDIR /app
 RUN corepack enable
 
+# Baked into the bundle for the browser tab title; there's no .env at build time.
+ARG VITE_APP_NAME=Sawirpixel
+ENV VITE_APP_NAME=$VITE_APP_NAME
+
 COPY package.json pnpm-lock.yaml .npmrc vite.config.js tsconfig.json ./
 # Tailwind scans Laravel's pagination views in vendor for class names.
 COPY --from=vendor /var/www/html/vendor ./vendor
