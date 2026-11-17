@@ -105,7 +105,8 @@ test('charges nothing for a failed generation', function (): void {
     expect($generation->status)->toBe(GenerationStatus::Failed);
     expect($generation->charge)->toBe('0.0000000000');
     expect($generation->provider_cost)->toBe('0.000000000');
-    expect($generation->error_message)->toBe('No image could be produced.');
+    expect($generation->error_code)->toBe('generation_failed');
+    expect($generation->error_message)->toBe("We couldn't generate this image. You have not been charged.");
 });
 
 test('matches an event that arrives before the submission stored the pixelforge id', function (): void {

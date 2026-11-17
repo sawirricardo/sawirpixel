@@ -29,7 +29,7 @@ final class GenerationEstimateController
         );
 
         return response()->json([
-            ...$estimate->toArray(),
+            ...$estimate->toCustomerArray(),
             'affordable' => $user?->currentOrganization instanceof Organization
                 ? ! BigDecimal::of($user->currentOrganization->credit_balance)->isLessThan($estimate->chargeMax)
                 : null,

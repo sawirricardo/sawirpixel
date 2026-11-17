@@ -39,11 +39,7 @@ export type Money = { amount: string; formatted: string };
 
 export type CostEstimate = {
     charge: Range<Money>;
-    provider_cost: Range<string>;
-    tokens: Record<
-        'input_text' | 'input_image' | 'output' | 'reasoning',
-        Range<number>
-    > /** Whether the user's balance covers the maximum; null for guests. */;
+    /** Whether the organization's balance covers the maximum; null for guests. */
     affordable: boolean | null;
 };
 

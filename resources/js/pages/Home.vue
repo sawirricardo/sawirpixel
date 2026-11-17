@@ -536,11 +536,6 @@ function onKeydown(event: KeyboardEvent): void {
                         <span
                             class="text-sm text-zinc-500 tabular-nums"
                             aria-live="polite"
-                            :title="
-                                estimate.response
-                                    ? `Prompt ${estimate.response.tokens.input_text.min}–${estimate.response.tokens.input_text.max} tokens · output ${estimate.response.tokens.output.max} · reasoning ${estimate.response.tokens.reasoning.min}–${estimate.response.tokens.reasoning.max}`
-                                    : undefined
-                            "
                         >
                             <template
                                 v-if="estimate.response && !estimate.hasErrors"

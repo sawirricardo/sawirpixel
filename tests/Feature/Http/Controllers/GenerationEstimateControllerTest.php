@@ -18,15 +18,10 @@ test('estimates the exact charge range from pixelforge pricing plus the markup',
             'min' => ['amount' => '0.0581750000', 'formatted' => '$0.06'],
             'max' => ['amount' => '0.0863250000', 'formatted' => '$0.09'],
         ],
-        'provider_cost' => ['min' => '0.046540000', 'max' => '0.069060000'],
-        'tokens' => [
-            'input_text' => ['min' => 8, 'max' => 12],
-            'input_image' => ['min' => 0, 'max' => 0],
-            'output' => ['min' => 1100, 'max' => 1100],
-            'reasoning' => ['min' => 200, 'max' => 2000],
-        ],
         'affordable' => null,
     ]);
+    // Provider costs and token counts stay internal: they'd reveal the supplier's pricing and our margin.
+    $response->assertJsonMissingPath('provider_cost')->assertJsonMissingPath('tokens');
 });
 
 test('says whether the current organization can afford the maximum', function (string $balance, bool $affordable): void {

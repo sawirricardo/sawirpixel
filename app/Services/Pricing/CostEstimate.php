@@ -24,23 +24,15 @@ final readonly class CostEstimate
     ) {}
 
     /**
-     * @return array{
-     *     charge: array{min: array{amount: string, formatted: string}, max: array{amount: string, formatted: string}},
-     *     provider_cost: array{min: string, max: string},
-     *     tokens: array<string, array{min: int, max: int}>
-     * }
+     * What a customer sees: only the price range. Provider costs and token counts are internal (they'd
+     * reveal the supplier's pricing and our margin).
+     *
+     * @return array{charge: array{min: array{amount: string, formatted: string}, max: array{amount: string, formatted: string}}}
      */
-    public function toArray(): array
+    public function toCustomerArray(): array
     {
         return [
             'charge' => ['min' => Money::toArray($this->chargeMin), 'max' => Money::toArray($this->chargeMax)],
-            'provider_cost' => ['min' => (string) $this->providerCostMin, 'max' => (string) $this->providerCostMax],
-            'tokens' => [
-                'input_text' => ['min' => $this->inputTextTokens->min, 'max' => $this->inputTextTokens->max],
-                'input_image' => ['min' => $this->inputImageTokens->min, 'max' => $this->inputImageTokens->max],
-                'output' => ['min' => $this->outputTokens->min, 'max' => $this->outputTokens->max],
-                'reasoning' => ['min' => $this->reasoningTokens->min, 'max' => $this->reasoningTokens->max],
-            ],
         ];
     }
 }

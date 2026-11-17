@@ -8,6 +8,7 @@ use App\Enums\GenerationStatus;
 use App\Enums\Pixelforge\GenerationStatus as PixelforgeStatus;
 use App\Models\Generation;
 use App\Services\Billing\CreditLedger;
+use App\Services\Generations\FailureMessage;
 use App\Services\Pixelforge\Data\Generation as PixelforgeGeneration;
 use App\Services\Pixelforge\Data\GenerationRates;
 use App\Services\Pixelforge\Data\GenerationUsage;
@@ -106,7 +107,7 @@ final readonly class ApplyPixelforgeGeneration
 
         $this->ledger->settle($generation, null);
         $generation->error_code = $snapshot->error?->code;
-        $generation->error_message = $snapshot->error?->message;
+        $generation->error_message = FailureMessage::for($snapshot->error?->code);
         $generation->completed_at = $snapshot->completedAt ?? now();
     }
 

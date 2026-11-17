@@ -69,6 +69,7 @@ test('fails a rejected prompt without charging for it', function (): void {
     $generation->refresh();
     expect($generation->status)->toBe(GenerationStatus::Failed);
     expect($generation->error_code)->toBe('content_policy_violation');
+    expect($generation->error_message)->toBe("This prompt can't be generated because it goes against our content policy. You have not been charged.");
     expect($generation->charge)->toBe('0.0000000000');
 });
 

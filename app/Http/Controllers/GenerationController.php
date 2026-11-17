@@ -160,11 +160,13 @@ final class GenerationController
             'prompt' => $generation->prompt,
             'size' => $generation->size->value,
             'quality' => $generation->quality->value,
-            'reference_images' => $generation->reference_images,
+            // A follow-up's first reference is its parent's image, which is the provider's link; customers only see the ones they added.
+            'reference_images' => $generation->parent_id === null ? $generation->reference_images : array_slice($generation->reference_images, 1),
             'status' => $generation->status->value,
             'estimated_charge' => ['min' => Money::toArray($generation->estimated_charge_min), 'max' => Money::toArray($generation->estimated_charge_max)],
             'charge' => $generation->charge === null ? null : Money::toArray($generation->charge),
-            'image_url' => $generation->image_url,
+            // Served from our own address, never the provider's.
+            'image_url' => $generation->image_url === null ? null : route('generations.image', $generation, absolute: false),
             'image_url_expires_at' => $generation->image_url_expires_at?->toIso8601String(),
             'error_message' => $generation->error_message,
             'created_at' => $generation->created_at?->toIso8601String(),

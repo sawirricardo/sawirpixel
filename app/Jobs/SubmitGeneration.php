@@ -8,6 +8,7 @@ use App\Enums\GenerationStatus;
 use App\Exceptions\Pixelforge\PixelforgeException;
 use App\Models\Generation;
 use App\Services\Billing\CreditLedger;
+use App\Services\Generations\FailureMessage;
 use App\Services\Pixelforge\Data\GenerationRequest;
 use App\Services\Pixelforge\PixelforgeClient;
 use Carbon\CarbonInterface;
@@ -98,7 +99,7 @@ final class SubmitGeneration implements ShouldBeUnique, ShouldQueue
      */
     public function failed(?Throwable $exception): void
     {
-        $this->markFailed('submission_failed', 'We could not submit this to Pixelforge in time. You have not been charged.');
+        $this->markFailed('submission_failed');
     }
 
     private function submit(PixelforgeClient $client, Generation $generation): void
@@ -116,7 +117,7 @@ final class SubmitGeneration implements ShouldBeUnique, ShouldQueue
             );
         } catch (PixelforgeException $pixelforgeException) {
             if ($pixelforgeException->isDailyLimit()) {
-                $this->markFailed('daily_limit_exceeded', "Pixelforge's daily generation limit has been reached. Try again after midnight UTC. You have not been charged.");
+                $this->markFailed('daily_limit_exceeded');
 
                 return;
             }
@@ -127,7 +128,7 @@ final class SubmitGeneration implements ShouldBeUnique, ShouldQueue
                 return;
             }
 
-            $this->markFailed($pixelforgeException->errorCode ?? 'submission_rejected', $pixelforgeException->getMessage());
+            $this->markFailed($pixelforgeException->errorCode ?? 'submission_rejected');
 
             return;
         }
@@ -158,15 +159,15 @@ final class SubmitGeneration implements ShouldBeUnique, ShouldQueue
      * The generation was never accepted, so it costs nothing: mark it failed and return its hold. Only
      * the call that actually moves it out of pending releases anything.
      */
-    private function markFailed(string $code, string $message): void
+    private function markFailed(string $code): void
     {
-        DB::transaction(function () use ($code, $message): void {
+        DB::transaction(function () use ($code): void {
             $updated = Generation::query()->whereKey($this->generation->id)->where('status', GenerationStatus::Pending)->update([
                 'status' => GenerationStatus::Failed,
                 'provider_cost' => '0',
                 'charge' => '0',
                 'error_code' => $code,
-                'error_message' => $message,
+                'error_message' => FailureMessage::for($code),
                 'completed_at' => now(),
             ]);
 

@@ -58,7 +58,7 @@ const brokenImages = reactive(new Set<number>());
 
 const statusLabel: Record<GenerationStatus, string> = {
     pending: 'Waiting to be submitted…',
-    queued: 'Queued at Pixelforge…',
+    queued: 'Queued…',
     processing: 'Generating…',
     succeeded: 'Done',
     failed: 'Failed',
