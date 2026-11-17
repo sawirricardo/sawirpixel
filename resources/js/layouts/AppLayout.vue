@@ -60,6 +60,13 @@ const success = computed(() => {
                     >
                         Profit report
                     </Link>
+                    <Link
+                        v-if="auth.user?.is_super_admin"
+                        href="/admin/users"
+                        class="text-sm text-zinc-600 hover:text-zinc-900"
+                    >
+                        Users
+                    </Link>
                 </div>
                 <div class="flex items-center gap-4 text-sm">
                     <template v-if="auth.user">

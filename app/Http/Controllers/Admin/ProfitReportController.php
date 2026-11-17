@@ -10,7 +10,6 @@ use App\Services\Pixelforge\Data\UsageReport;
 use App\Services\Pixelforge\PixelforgeClient;
 use App\Services\Reporting\ProfitReport;
 use Illuminate\Http\Client\ConnectionException;
-use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
 use RuntimeException;
@@ -19,8 +18,6 @@ final class ProfitReportController
 {
     public function index(ProfitReportRequest $request, ProfitReport $report, PixelforgeClient $client): Response
     {
-        Gate::authorize('viewProfitReport');
-
         $pixelforge = null;
         $pixelforgeError = null;
 

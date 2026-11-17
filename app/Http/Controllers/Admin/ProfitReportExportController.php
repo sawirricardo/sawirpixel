@@ -8,7 +8,6 @@ use App\Http\Requests\ProfitReportRequest;
 use App\Models\Generation;
 use App\Services\Reporting\ProfitReport;
 use Brick\Math\BigDecimal;
-use Illuminate\Support\Facades\Gate;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -19,8 +18,6 @@ final class ProfitReportExportController
 {
     public function __invoke(ProfitReportRequest $request, ProfitReport $report): StreamedResponse
     {
-        Gate::authorize('viewProfitReport');
-
         $filename = sprintf('generations-%s-to-%s.csv', $request->startDate()->toDateString(), $request->endDate()->toDateString());
 
         return response()->streamDownload(function () use ($report, $request): void {

@@ -68,6 +68,16 @@ final class User extends Authenticatable
     }
 
     /**
+     * Every generation the user has submitted, in any organization.
+     *
+     * @return HasMany<Generation, $this>
+     */
+    public function generations(): HasMany
+    {
+        return $this->hasMany(Generation::class);
+    }
+
+    /**
      * The user's organization memberships.
      *
      * @return HasMany<OrgUser, $this>

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Http\Controllers\Admin\ProfitReportController;
 use App\Http\Controllers\Admin\ProfitReportExportController;
+use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\CurrentOrganizationController;
@@ -55,6 +56,17 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/generations', [GenerationController::class, 'index'])->name('generations.index');
     Route::post('/generations', [GenerationController::class, 'store'])->name('generations.store');
 
-    Route::get('/admin/reports/profit', [ProfitReportController::class, 'index'])->name('admin.reports.profit');
-    Route::get('/admin/reports/profit/generations.csv', ProfitReportExportController::class)->name('admin.reports.profit.export');
+});
+
+/*
+ * Operator-only area. Everything under /admin requires a user listed in APP_ADMINS; the access check
+ * lives here, on the group, so a new admin route can't forget it. Horizon is served at /admin/horizon
+ * and enforces the same gate through Horizon::auth.
+ */
+Route::prefix('admin')->name('admin.')->middleware(['auth', 'can:accessAdmin'])->group(function (): void {
+    Route::get('/reports/profit', [ProfitReportController::class, 'index'])->name('reports.profit');
+    Route::get('/reports/profit/generations.csv', ProfitReportExportController::class)->name('reports.profit.export');
+
+    Route::get('/users', [AdminUserController::class, 'index'])->name('users.index');
+    Route::get('/users/{user}', [AdminUserController::class, 'show'])->name('users.show');
 });

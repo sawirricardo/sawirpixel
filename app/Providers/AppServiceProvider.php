@@ -95,11 +95,9 @@ final class AppServiceProvider extends ServiceProvider
         RateLimiter::for('pixelforge', fn (): Limit => Limit::perMinute(config()->integer('services.pixelforge.requests_per_minute')));
 
         Gate::define('viewApiDocs', fn (User $user): bool => $user->isSuperAdmin());
-        Gate::define('viewHorizon', fn (User $user): bool => $user->isSuperAdmin());
-        Gate::define('viewProfitReport', fn (User $user): bool => $user->isSuperAdmin());
+        Gate::define('accessAdmin', fn (User $user): bool => $user->isSuperAdmin());
 
-        Horizon::auth(fn (Request $request): bool => app()->environment('local')
-            || Gate::check('viewHorizon', [$request->user()]));
+        Horizon::auth(fn (Request $request): bool => Gate::check('accessAdmin', [$request->user()]));
 
         // @codeCoverageIgnoreStart
         Scramble::configure()
