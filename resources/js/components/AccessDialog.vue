@@ -315,6 +315,22 @@ const primaryClass =
                     >
                         Create account
                     </button>
+                    <p class="text-center text-xs text-zinc-500">
+                        By creating an account, you agree to the
+                        <Link
+                            href="/terms"
+                            class="underline hover:text-zinc-900"
+                            @click="open = false"
+                            >terms of service</Link
+                        >
+                        and
+                        <Link
+                            href="/privacy"
+                            class="underline hover:text-zinc-900"
+                            @click="open = false"
+                            >privacy policy</Link
+                        >.
+                    </p>
                 </form>
             </template>
         </div>

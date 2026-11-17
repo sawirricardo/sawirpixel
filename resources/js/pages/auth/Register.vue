@@ -58,6 +58,16 @@ const fields = [
                 >
                     Create account
                 </button>
+                <p class="text-center text-xs text-zinc-500">
+                    By creating an account, you agree to the
+                    <Link href="/terms" class="underline hover:text-zinc-900"
+                        >terms of service</Link
+                    >
+                    and
+                    <Link href="/privacy" class="underline hover:text-zinc-900"
+                        >privacy policy</Link
+                    >.
+                </p>
                 <p class="text-center text-sm text-zinc-600">
                     Already registered?
                     <Link href="/login" class="font-medium text-zinc-900">

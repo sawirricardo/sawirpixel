@@ -262,6 +262,14 @@ const success = computed(() => {
                 </p>
                 <slot />
             </main>
+            <footer
+                v-if="page.component !== 'generations/Show'"
+                class="mx-auto w-full max-w-5xl px-6 pb-8 text-xs text-zinc-500"
+            >
+                <Link href="/terms" class="hover:text-zinc-900">Terms</Link>
+                <span class="mx-2" aria-hidden="true">·</span>
+                <Link href="/privacy" class="hover:text-zinc-900">Privacy</Link>
+            </footer>
         </div>
 
         <BuyCreditsDialog v-model:open="creditsDialog.open.value" />
