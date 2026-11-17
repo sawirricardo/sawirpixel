@@ -41,7 +41,7 @@ return [
 
     'legal' => [
         'operator' => env('LEGAL_OPERATOR', 'Sawir Studio'),
-        'contact_email' => env('LEGAL_CONTACT_EMAIL'),
+        'contact_email' => env('LEGAL_CONTACT_EMAIL', env('MAIL_FROM_ADDRESS')),
         'updated_at' => '2026-11-17',
     ],
 
