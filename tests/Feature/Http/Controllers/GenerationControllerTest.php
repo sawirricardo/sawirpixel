@@ -148,7 +148,10 @@ describe('store', function (): void {
 describe('show', function (): void {
     test('shows the user one of their generations in the current organization', function (): void {
         $user = organizationOwner();
-        $generation = Generation::factory()->queued()->for($user)->for($user->currentOrganization)->create(['prompt' => 'A lighthouse']);
+        $generation = Generation::factory()->queued()->for($user)->for($user->currentOrganization)->create([
+            'prompt' => 'A lighthouse',
+            'image_url_expires_at' => '2026-11-18 12:49:39',
+        ]);
 
         $response = $this->actingAs($user)->get(route('generations.show', $generation));
 
@@ -157,6 +160,7 @@ describe('show', function (): void {
             ->where('generation.id', $generation->id)
             ->where('generation.prompt', 'A lighthouse')
             ->where('generation.status', 'queued')
+            ->where('generation.image_url_expires_at', '2026-11-18T12:49:39+00:00')
             ->where('recentGenerations.0.id', $generation->id));
     });
 

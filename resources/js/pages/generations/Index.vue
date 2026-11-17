@@ -2,7 +2,9 @@
 import { Head, Link, usePoll } from '@inertiajs/vue3';
 import { computed, reactive, watch } from 'vue';
 import AppLayout from '@/layouts/AppLayout.vue';
+import { describeExpiry } from '@/lib/expiry';
 import { formatMoneyRange } from '@/lib/money';
+import { useNow } from '@/lib/useNow';
 import type { GenerationItem, GenerationStatus, Paginated } from '@/types';
 
 const props = defineProps<{
@@ -28,6 +30,8 @@ watch(hasInProgress, (active) => (active ? start() : stop()), {
 });
 
 const brokenImages = reactive(new Set<number>());
+
+const now = useNow();
 
 const statusStyles: Record<GenerationStatus, string> = {
     pending: 'bg-zinc-100 text-zinc-700',
@@ -116,6 +120,22 @@ function statusLabel(status: GenerationStatus): string {
                             · {{ generation.reference_images.length }}
                             reference image(s)
                         </template>
+                    </p>
+                    <p
+                        v-if="
+                            generation.status === 'succeeded' &&
+                            generation.image_url_expires_at
+                        "
+                        class="text-xs text-zinc-500"
+                        :title="
+                            new Date(
+                                generation.image_url_expires_at,
+                            ).toLocaleString()
+                        "
+                    >
+                        {{
+                            describeExpiry(generation.image_url_expires_at, now)
+                        }}
                     </p>
                     <dl class="grid grid-cols-2 gap-2 text-xs">
                         <div>

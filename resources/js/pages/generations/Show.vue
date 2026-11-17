@@ -2,7 +2,9 @@
 import { Head, usePoll } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
 import AppLayout from '@/layouts/AppLayout.vue';
+import { describeExpiry } from '@/lib/expiry';
 import { formatMoneyRange } from '@/lib/money';
+import { useNow } from '@/lib/useNow';
 import type { GenerationItem, GenerationStatus } from '@/types';
 
 const props = defineProps<{
@@ -21,6 +23,13 @@ const { start, stop } = usePoll(
 watch(running, (active) => (active ? start() : stop()), { immediate: true });
 
 const imageBroken = ref(false);
+
+const now = useNow();
+const expiry = computed(() =>
+    props.generation.status === 'succeeded'
+        ? describeExpiry(props.generation.image_url_expires_at, now.value)
+        : null,
+);
 
 watch(
     () => props.generation.id,
@@ -93,6 +102,20 @@ function formatDate(date: string | null): string {
                         {{ statusLabel[generation.status] }}
                     </p>
                 </div>
+                <p
+                    v-if="expiry"
+                    class="border-b border-zinc-100 px-4 py-2 text-xs text-zinc-500"
+                    :title="
+                        generation.image_url_expires_at
+                            ? new Date(
+                                  generation.image_url_expires_at,
+                              ).toLocaleString()
+                            : undefined
+                    "
+                >
+                    {{ expiry }} · Pixelforge's links last 24 hours, so save the
+                    image if you want to keep it.
+                </p>
                 <dl class="grid grid-cols-2 gap-4 p-4 text-sm sm:grid-cols-4">
                     <div>
                         <dt class="text-xs text-zinc-500">Status</dt>
