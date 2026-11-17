@@ -23,13 +23,13 @@ const fields = [
 <template>
     <AppLayout>
         <Head title="Create account" />
-        <div class="mx-auto max-w-sm">
+        <div class="mx-auto max-w-md">
             <h1 class="text-2xl font-semibold">Create an account</h1>
             <Form
                 action="/register"
                 method="post"
                 :reset-on-error="['password', 'password_confirmation']"
-                class="mt-6 space-y-4"
+                class="mt-6 space-y-5"
                 #default="{ errors, processing }"
             >
                 <div v-for="field in fields" :key="field.name">
@@ -42,7 +42,7 @@ const fields = [
                         :type="field.type"
                         :autocomplete="field.autocomplete"
                         required
-                        class="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm"
+                        class="mt-1 w-full rounded-xl border border-zinc-300 bg-white px-3.5 py-2.5 text-sm"
                     />
                     <p
                         v-if="errors[field.name]"
@@ -54,7 +54,7 @@ const fields = [
                 <button
                     type="submit"
                     :disabled="processing"
-                    class="w-full rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-50"
+                    class="w-full rounded-full bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-50"
                 >
                     Create account
                 </button>

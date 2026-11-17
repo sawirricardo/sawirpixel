@@ -6,13 +6,13 @@ import AppLayout from '@/layouts/AppLayout.vue';
 <template>
     <AppLayout>
         <Head title="Log in" />
-        <div class="mx-auto max-w-sm">
+        <div class="mx-auto max-w-md">
             <h1 class="text-2xl font-semibold">Log in</h1>
             <Form
                 action="/login"
                 method="post"
                 :reset-on-error="['password']"
-                class="mt-6 space-y-4"
+                class="mt-6 space-y-5"
                 #default="{ errors, processing }"
             >
                 <div>
@@ -26,7 +26,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
                         autocomplete="email"
                         required
                         autofocus
-                        class="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm"
+                        class="mt-1 w-full rounded-xl border border-zinc-300 bg-white px-3.5 py-2.5 text-sm"
                     />
                     <p v-if="errors.email" class="mt-1 text-xs text-red-600">
                         {{ errors.email }}
@@ -42,7 +42,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
                         type="password"
                         autocomplete="current-password"
                         required
-                        class="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm"
+                        class="mt-1 w-full rounded-xl border border-zinc-300 bg-white px-3.5 py-2.5 text-sm"
                     />
                     <p v-if="errors.password" class="mt-1 text-xs text-red-600">
                         {{ errors.password }}
@@ -62,7 +62,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
                 <button
                     type="submit"
                     :disabled="processing"
-                    class="w-full rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-50"
+                    class="w-full rounded-full bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-50"
                 >
                     Log in
                 </button>

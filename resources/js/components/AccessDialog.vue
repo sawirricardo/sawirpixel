@@ -59,7 +59,7 @@ function submitOrganization(): void {
 }
 
 const inputClass =
-    'mt-1 w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm focus:border-zinc-400 focus:outline-none';
+    'mt-1 w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 text-sm focus:border-zinc-400 focus:outline-none';
 const primaryClass =
     'w-full rounded-full bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-50';
 </script>
@@ -67,12 +67,12 @@ const primaryClass =
 <template>
     <dialog
         ref="dialog"
-        class="m-auto w-full max-w-sm rounded-3xl bg-white p-0 shadow-xl backdrop:bg-zinc-900/40 backdrop:backdrop-blur-sm"
+        class="m-auto w-full max-w-md rounded-3xl bg-white p-0 shadow-xl backdrop:bg-zinc-900/40 backdrop:backdrop-blur-sm"
         aria-labelledby="access-dialog-title"
         @close="open = false"
         @click="closeOnBackdrop"
     >
-        <div class="relative p-6">
+        <div class="relative p-8">
             <button
                 type="button"
                 class="absolute top-4 right-4 rounded-full p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700"
