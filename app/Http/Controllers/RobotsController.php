@@ -56,7 +56,7 @@ final class RobotsController
 
         $lines = [
             "# Content Signals: search=yes (index it), ai-input=yes (quote it in AI answers), ai-train=no (don't train on it).",
-            '# The API is described at /.well-known/api-catalog.',
+            '# The API is described at /.well-known/api-catalog, and the MCP server at /.well-known/mcp/server-card.json.',
             '',
             'User-agent: *',
             ...$rules,

@@ -10,7 +10,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Adds Link headers (RFC 8288) to public pages, so agents can find the API catalog, the API's
- * description and docs, and the sitemap without guessing paths.
+ * description and docs, the MCP server card and the sitemap without guessing paths.
  */
 final class AdvertiseDiscovery
 {
@@ -25,6 +25,7 @@ final class AdvertiseDiscovery
             '</.well-known/api-catalog>; rel="api-catalog"',
             '</docs/api.json>; rel="service-desc"; type="application/json"',
             '</docs/api>; rel="service-doc"; type="text/html"',
+            '</.well-known/mcp/server-card.json>; rel="mcp-server-card"; type="application/json"',
             '</sitemap.xml>; rel="sitemap"; type="application/xml"',
         ]), false);
 

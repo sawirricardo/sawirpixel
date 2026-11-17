@@ -23,6 +23,7 @@ use App\Http\Controllers\InvitationAcceptanceController;
 use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\LegalController;
 use App\Http\Controllers\MarkNotificationsReadController;
+use App\Http\Controllers\McpServerCardController;
 use App\Http\Controllers\MemberController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OrganizationController;
@@ -45,6 +46,7 @@ Route::get('/', HomeController::class)->middleware([AdvertiseDiscovery::class, N
 Route::get('/robots.txt', RobotsController::class)->name('robots');
 Route::get('/sitemap.xml', SitemapController::class)->name('sitemap');
 Route::get('/.well-known/api-catalog', ApiCatalogController::class)->name('api-catalog');
+Route::get('/.well-known/mcp/server-card.json', McpServerCardController::class)->name('mcp.server-card');
 Route::get('/terms', [LegalController::class, 'show'])->defaults('document', 'terms')->middleware([AdvertiseDiscovery::class, NegotiateMarkdown::class.':terms'])->name('terms');
 Route::get('/privacy', [LegalController::class, 'show'])->defaults('document', 'privacy')->middleware([AdvertiseDiscovery::class, NegotiateMarkdown::class.':privacy'])->name('privacy');
 
