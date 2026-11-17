@@ -35,24 +35,26 @@ final class GenerationController
             ->whereBelongsTo($user)
             ->latest('id')
             ->paginate(self::PER_PAGE)
-            ->through(fn (Generation $generation): array => [
-                'id' => $generation->id,
-                'prompt' => $generation->prompt,
-                'size' => $generation->size->value,
-                'quality' => $generation->quality->value,
-                'reference_images' => $generation->reference_images,
-                'status' => $generation->status->value,
-                'estimated_charge' => ['min' => Money::toArray($generation->estimated_charge_min), 'max' => Money::toArray($generation->estimated_charge_max)],
-                'charge' => $generation->charge === null ? null : Money::toArray($generation->charge),
-                'image_url' => $generation->image_url,
-                'image_url_expires_at' => $generation->image_url_expires_at?->toIso8601String(),
-                'error_message' => $generation->error_message,
-                'created_at' => $generation->created_at?->toIso8601String(),
-                'completed_at' => $generation->completed_at?->toIso8601String(),
-            ]);
+            ->through($this->present(...));
 
         return Inertia::render('generations/Index', [
             'generations' => $generations,
+        ]);
+    }
+
+    /**
+     * One generation, for its own page. Only the user who made it can see it, and only while working in
+     * that generation's organization; anything else is reported as missing.
+     */
+    public function show(#[CurrentUser] User $user, string $generation): Response
+    {
+        $generation = Generation::query()
+            ->whereBelongsTo($user)
+            ->where('organization_id', $user->current_organization_id)
+            ->findOrFail($generation);
+
+        return Inertia::render('generations/Show', [
+            'generation' => $this->present($generation),
         ]);
     }
 
@@ -90,6 +92,28 @@ final class GenerationController
 
         Inertia::flash('success', 'Your image is on its way. You will only be charged if it succeeds.');
 
-        return to_route('generations.index');
+        return to_route('generations.show', $generation);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function present(Generation $generation): array
+    {
+        return [
+            'id' => $generation->id,
+            'prompt' => $generation->prompt,
+            'size' => $generation->size->value,
+            'quality' => $generation->quality->value,
+            'reference_images' => $generation->reference_images,
+            'status' => $generation->status->value,
+            'estimated_charge' => ['min' => Money::toArray($generation->estimated_charge_min), 'max' => Money::toArray($generation->estimated_charge_max)],
+            'charge' => $generation->charge === null ? null : Money::toArray($generation->charge),
+            'image_url' => $generation->image_url,
+            'image_url_expires_at' => $generation->image_url_expires_at?->toIso8601String(),
+            'error_message' => $generation->error_message,
+            'created_at' => $generation->created_at?->toIso8601String(),
+            'completed_at' => $generation->completed_at?->toIso8601String(),
+        ];
     }
 }

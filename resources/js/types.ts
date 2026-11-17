@@ -5,8 +5,17 @@ export type AuthUser = {
     is_super_admin: boolean;
 };
 
+export type RecentGeneration = {
+    id: number;
+    prompt: string;
+    status: GenerationStatus;
+    image_url: string | null;
+    created_at: string | null;
+};
+
 export type SharedProps = {
     name: string;
+    recentGenerations: RecentGeneration[];
     auth: {
         user: AuthUser | null;
         organization: { id: number; name: string } | null;

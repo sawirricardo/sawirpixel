@@ -25,9 +25,8 @@ describe('store', function (): void {
             'status' => 'succeeded',
         ]);
 
-        $response->assertRedirect(route('generations.index'));
-
         $generation = Generation::query()->sole();
+        $response->assertRedirect(route('generations.show', $generation));
         expect($generation->user_id)->toBe($user->id);
         expect($generation->organization_id)->toBe($user->current_organization_id);
         expect($generation->status)->toBe(GenerationStatus::Pending);
@@ -89,6 +88,32 @@ describe('store', function (): void {
         'five reference images' => [['reference_images' => array_map(fn (int $i): string => "https://example.com/{$i}.png", range(1, 5))], 'reference_images'],
         'reference image that is not a url' => [['reference_images' => ['not a url']], 'reference_images.0'],
     ]);
+});
+
+describe('show', function (): void {
+    test('shows the user one of their generations in the current organization', function (): void {
+        $user = organizationOwner();
+        $generation = Generation::factory()->queued()->for($user)->for($user->currentOrganization)->create(['prompt' => 'A lighthouse']);
+
+        $response = $this->actingAs($user)->get(route('generations.show', $generation));
+
+        $response->assertOk()->assertInertia(fn (Assert $page): Assert => $page
+            ->component('generations/Show')
+            ->where('generation.id', $generation->id)
+            ->where('generation.prompt', 'A lighthouse')
+            ->where('generation.status', 'queued')
+            ->where('recentGenerations.0.id', $generation->id));
+    });
+
+    test('hides generations that belong to someone else or another organization', function (string $whose): void {
+        $user = organizationOwner();
+        $generation = match ($whose) {
+            'teammate' => Generation::factory()->for($user->currentOrganization)->create(),
+            'other organization' => Generation::factory()->for($user)->create(),
+        };
+
+        $this->actingAs($user)->get(route('generations.show', $generation))->assertNotFound();
+    })->with(['teammate', 'other organization']);
 });
 
 describe('index', function (): void {

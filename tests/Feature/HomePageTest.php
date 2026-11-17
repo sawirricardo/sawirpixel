@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Models\Generation;
 use App\Models\OrgUser;
 use App\Models\User;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -48,4 +49,25 @@ test('does not let a member without the generate permission submit', function ()
     $response = $this->actingAs($user)->get(route('home'));
 
     $response->assertInertia(fn (Assert $page): Assert => $page->where('canGenerate', false));
+});
+
+test("lists the user's latest generations in their current organization for the sidebar", function (): void {
+    $user = organizationOwner();
+    $older = Generation::factory()->for($user)->for($user->currentOrganization)->create(['prompt' => 'Older']);
+    $newer = Generation::factory()->queued()->for($user)->for($user->currentOrganization)->create(['prompt' => str_repeat('x', 100)]);
+    Generation::factory()->for($user->currentOrganization)->create(['prompt' => 'Teammate']);
+    Generation::factory()->for($user)->create(['prompt' => 'Other organization']);
+
+    $response = $this->actingAs($user)->get(route('home'));
+
+    $response->assertInertia(fn (Assert $page): Assert => $page
+        ->has('recentGenerations', 2)
+        ->where('recentGenerations.0.id', $newer->id)
+        ->where('recentGenerations.0.prompt', str_repeat('x', 80).'...')
+        ->where('recentGenerations.0.status', 'queued')
+        ->where('recentGenerations.1.id', $older->id));
+});
+
+test('has no sidebar history for a guest', function (): void {
+    $this->get(route('home'))->assertInertia(fn (Assert $page): Assert => $page->where('recentGenerations', []));
 });

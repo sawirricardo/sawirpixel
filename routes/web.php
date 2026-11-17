@@ -55,6 +55,7 @@ Route::middleware('auth')->group(function (): void {
 
     Route::get('/generations', [GenerationController::class, 'index'])->name('generations.index');
     Route::post('/generations', [GenerationController::class, 'store'])->name('generations.store');
+    Route::get('/generations/{generation}', [GenerationController::class, 'show'])->name('generations.show');
 
 });
 

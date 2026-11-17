@@ -4,14 +4,18 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
+use App\Models\Generation;
 use App\Models\OrgUser;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Str;
 use Inertia\Middleware;
 
 final class HandleInertiaRequests extends Middleware
 {
+    public const int SIDEBAR_GENERATIONS = 30;
+
     /**
      * The root template that's loaded on the first page visit.
      *
@@ -31,6 +35,7 @@ final class HandleInertiaRequests extends Middleware
         return [
             ...parent::share($request),
             'name' => config('app.name'),
+            'recentGenerations' => fn (): array => $this->recentGenerations($user),
             'auth' => [
                 'user' => $user instanceof User ? [
                     'id' => $user->id,
@@ -56,5 +61,31 @@ final class HandleInertiaRequests extends Middleware
                     && Gate::forUser($user)->allows('viewMembers', $user->currentOrganization),
             ],
         ];
+    }
+
+    /**
+     * The sidebar's history: the user's latest generations in their current organization.
+     *
+     * @return list<array{id: int, prompt: string, status: string, image_url: string|null, created_at: string|null}>
+     */
+    private function recentGenerations(mixed $user): array
+    {
+        if (! $user instanceof User || $user->current_organization_id === null) {
+            return [];
+        }
+
+        return array_values($user->generations()
+            ->where('organization_id', $user->current_organization_id)
+            ->latest('id')
+            ->limit(self::SIDEBAR_GENERATIONS)
+            ->get(['id', 'prompt', 'status', 'image_url', 'created_at'])
+            ->map(fn (Generation $generation): array => [
+                'id' => $generation->id,
+                'prompt' => Str::limit($generation->prompt, 80),
+                'status' => $generation->status->value,
+                'image_url' => $generation->image_url,
+                'created_at' => $generation->created_at?->toIso8601String(),
+            ])
+            ->all());
     }
 }
