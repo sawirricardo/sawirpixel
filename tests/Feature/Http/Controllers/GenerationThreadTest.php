@@ -136,10 +136,10 @@ describe('thread page', function (): void {
         $response->assertInertia(fn (Assert $page): Assert => $page
             ->where('branchCount', 2)
             ->where('versions', [
-                ['id' => $v1->id, 'number' => 1, 'depth' => 0, 'prompt' => 'A lighthouse', 'status' => 'succeeded', 'image_url' => '/generations/'.$v1->id.'/image', 'on_path' => true, 'is_current' => false],
-                ['id' => $v2->id, 'number' => 2, 'depth' => 1, 'prompt' => 'Stormier sky', 'status' => 'succeeded', 'image_url' => '/generations/'.$v2->id.'/image', 'on_path' => true, 'is_current' => false],
-                ['id' => $v3a->id, 'number' => 3, 'depth' => 2, 'prompt' => 'Add a ship', 'status' => 'succeeded', 'image_url' => '/generations/'.$v3a->id.'/image', 'on_path' => false, 'is_current' => false],
-                ['id' => $v3b->id, 'number' => 4, 'depth' => 2, 'prompt' => 'Make it night', 'status' => 'succeeded', 'image_url' => '/generations/'.$v3b->id.'/image', 'on_path' => true, 'is_current' => true],
+                ['id' => $v1->id, 'number' => 1, 'depth' => 0, 'prompt' => 'A lighthouse', 'status' => 'succeeded', 'image_url' => $v1->image_url, 'on_path' => true, 'is_current' => false],
+                ['id' => $v2->id, 'number' => 2, 'depth' => 1, 'prompt' => 'Stormier sky', 'status' => 'succeeded', 'image_url' => $v2->image_url, 'on_path' => true, 'is_current' => false],
+                ['id' => $v3a->id, 'number' => 3, 'depth' => 2, 'prompt' => 'Add a ship', 'status' => 'succeeded', 'image_url' => $v3a->image_url, 'on_path' => false, 'is_current' => false],
+                ['id' => $v3b->id, 'number' => 4, 'depth' => 2, 'prompt' => 'Make it night', 'status' => 'succeeded', 'image_url' => $v3b->image_url, 'on_path' => true, 'is_current' => true],
             ]));
     });
 
@@ -150,8 +150,20 @@ describe('thread page', function (): void {
 
         $this->actingAs($user)->get(route('generations.show', $v2))->assertInertia(fn (Assert $page): Assert => $page
             ->where('versions.0.image_url', null)
-            ->where('versions.1.image_url', '/generations/'.$v2->id.'/image')
+            ->where('versions.1.image_url', $v2->image_url)
             ->where('branchCount', 1));
+    });
+
+    test("lists only the reference images a follow-up's author added", function (): void {
+        $user = organizationOwner();
+        $parent = Generation::factory()->succeeded()->for($user)->for($user->currentOrganization)->create();
+        $followUp = Generation::factory()->succeeded()->continuing($parent)->create([
+            'reference_images' => [$parent->image_url, 'https://example.com/mine.png'],
+        ]);
+
+        $this->actingAs($user)->get(route('generations.show', $followUp))->assertInertia(fn (Assert $page): Assert => $page
+            ->where('generation.image_url', $followUp->image_url)
+            ->where('generation.reference_images', ['https://example.com/mine.png']));
     });
 
     test('points an earlier version to where its branch continues', function (): void {

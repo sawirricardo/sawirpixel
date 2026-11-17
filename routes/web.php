@@ -17,7 +17,6 @@ use App\Http\Controllers\CreditPurchaseController;
 use App\Http\Controllers\CurrentOrganizationController;
 use App\Http\Controllers\GenerationController;
 use App\Http\Controllers\GenerationEstimateController;
-use App\Http\Controllers\GenerationImageController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\InvitationAcceptanceController;
 use App\Http\Controllers\InvitationController;
@@ -100,7 +99,6 @@ Route::middleware(['auth', NoIndex::class])->group(function (): void {
     Route::get('/generations', [GenerationController::class, 'index'])->name('generations.index');
     Route::post('/generations', [GenerationController::class, 'store'])->middleware('verified')->name('generations.store');
     Route::get('/generations/{generation}', [GenerationController::class, 'show'])->name('generations.show');
-    Route::get('/generations/{generation}/image', GenerationImageController::class)->name('generations.image');
 
 });
 

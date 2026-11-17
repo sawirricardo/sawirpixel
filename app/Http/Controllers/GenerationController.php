@@ -169,13 +169,12 @@ final class GenerationController
             'prompt' => $generation->prompt,
             'size' => $generation->size->value,
             'quality' => $generation->quality->value,
-            // A follow-up's first reference is its parent's image, which is the provider's link; customers only see the ones they added.
+            // A follow-up's first reference is its parent's image, which the thread already shows; list only the ones they added.
             'reference_images' => $generation->parent_id === null ? $generation->reference_images : array_slice($generation->reference_images, 1),
             'status' => $generation->status->value,
             'estimated_charge' => ['min' => Money::toArray($generation->estimated_charge_min), 'max' => Money::toArray($generation->estimated_charge_max)],
             'charge' => $generation->charge === null ? null : Money::toArray($generation->charge),
-            // Served from our own address, never the provider's.
-            'image_url' => $generation->image_url === null ? null : route('generations.image', $generation, absolute: false),
+            'image_url' => $generation->image_url,
             'image_url_expires_at' => $generation->image_url_expires_at?->toIso8601String(),
             'error_message' => $generation->error_message,
             'created_at' => $generation->created_at?->toIso8601String(),
@@ -233,7 +232,7 @@ final class GenerationController
                 'depth' => $entry['depth'],
                 'prompt' => Str::limit($version->prompt, 60),
                 'status' => $version->status->value,
-                'image_url' => $version->canBeContinued() ? route('generations.image', $version, absolute: false) : null,
+                'image_url' => $version->canBeContinued() ? $version->image_url : null,
                 'on_path' => in_array($version->id, $onPath, true),
                 'is_current' => $version->id === $current->id,
             ];
