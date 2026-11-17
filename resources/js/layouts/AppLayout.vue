@@ -264,11 +264,19 @@ const success = computed(() => {
             </main>
             <footer
                 v-if="page.component !== 'generations/Show'"
-                class="mx-auto w-full max-w-5xl px-6 pb-8 text-xs text-zinc-500"
+                class="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-x-6 gap-y-2 px-6 pb-8 text-xs text-zinc-500"
             >
-                <Link href="/terms" class="hover:text-zinc-900">Terms</Link>
-                <span class="mx-2" aria-hidden="true">·</span>
-                <Link href="/privacy" class="hover:text-zinc-900">Privacy</Link>
+                <p>
+                    A demo built for the PromptEdit assessment. Credits are
+                    simulated and no real payments are taken.
+                </p>
+                <p>
+                    <Link href="/terms" class="hover:text-zinc-900">Terms</Link>
+                    <span class="mx-2" aria-hidden="true">·</span>
+                    <Link href="/privacy" class="hover:text-zinc-900"
+                        >Privacy</Link
+                    >
+                </p>
             </footer>
         </div>
 
