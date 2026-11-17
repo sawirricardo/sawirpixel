@@ -8,6 +8,8 @@ use App\Exceptions\Pixelforge\PixelforgeException;
 use App\Services\Pixelforge\Data\Generation;
 use App\Services\Pixelforge\Data\GenerationRequest;
 use App\Services\Pixelforge\Data\Pricing;
+use App\Services\Pixelforge\Data\UsageReport;
+use Carbon\CarbonInterface;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\RequestException;
@@ -68,6 +70,22 @@ final readonly class PixelforgeClient
             ->get('pricing');
 
         return Pricing::fromArray($this->successfulJson($response));
+    }
+
+    /**
+     * What Pixelforge billed this API key per UTC day of completion, inclusive of both dates (at most 92 days).
+     *
+     * @throws PixelforgeException
+     * @throws ConnectionException
+     */
+    public function usage(CarbonInterface $startDate, CarbonInterface $endDate): UsageReport
+    {
+        $response = $this->api()->get('usage', [
+            'start_date' => $startDate->toDateString(),
+            'end_date' => $endDate->toDateString(),
+        ]);
+
+        return UsageReport::fromArray($this->successfulJson($response));
     }
 
     /**

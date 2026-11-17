@@ -94,6 +94,7 @@ final class AppServiceProvider extends ServiceProvider
 
         Gate::define('viewApiDocs', fn (User $user): bool => $user->isSuperAdmin());
         Gate::define('viewHorizon', fn (User $user): bool => $user->isSuperAdmin());
+        Gate::define('viewProfitReport', fn (User $user): bool => $user->isSuperAdmin());
 
         Horizon::auth(fn (Request $request): bool => app()->environment('local')
             || Gate::check('viewHorizon', [$request->user()]));

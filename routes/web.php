@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Admin\ProfitReportController;
+use App\Http\Controllers\Admin\ProfitReportExportController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\GenerationController;
@@ -34,4 +36,7 @@ Route::middleware('auth')->group(function (): void {
 
     Route::get('/generations', [GenerationController::class, 'index'])->name('generations.index');
     Route::post('/generations', [GenerationController::class, 'store'])->name('generations.store');
+
+    Route::get('/admin/reports/profit', [ProfitReportController::class, 'index'])->name('admin.reports.profit');
+    Route::get('/admin/reports/profit/generations.csv', ProfitReportExportController::class)->name('admin.reports.profit.export');
 });

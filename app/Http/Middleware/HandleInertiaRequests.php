@@ -34,6 +34,7 @@ final class HandleInertiaRequests extends Middleware
                     'id' => $user->id,
                     'name' => $user->name,
                     'email' => $user->email,
+                    'is_super_admin' => $user->isSuperAdmin(),
                 ] : null,
                 'organization' => fn (): ?array => $user instanceof User && $user->currentOrganization !== null ? [
                     'id' => $user->currentOrganization->id,

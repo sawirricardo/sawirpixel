@@ -34,6 +34,7 @@ test('lets an organization owner submit', function (): void {
     $response->assertInertia(fn (Assert $page): Assert => $page
         ->where('canGenerate', true)
         ->where('auth.user.email', $user->email)
+        ->where('auth.user.is_super_admin', false)
         ->where('auth.organization.name', 'Acme Studio'));
 });
 
