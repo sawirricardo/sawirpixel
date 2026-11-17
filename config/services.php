@@ -37,10 +37,12 @@ return [
         'key' => env('RESEND_API_KEY'),
     ],
 
+    // Mail goes through SES with its own credentials (an IAM user that can only send as the app's
+    // domain), so the AWS_* settings stay free for anything else, like storage.
     'ses' => [
-        'key' => env('AWS_ACCESS_KEY_ID'),
-        'secret' => env('AWS_SECRET_ACCESS_KEY'),
-        'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
+        'key' => env('SES_KEY', env('AWS_ACCESS_KEY_ID')),
+        'secret' => env('SES_SECRET', env('AWS_SECRET_ACCESS_KEY')),
+        'region' => env('SES_REGION', env('AWS_DEFAULT_REGION', 'us-east-1')),
     ],
 
     'slack' => [
