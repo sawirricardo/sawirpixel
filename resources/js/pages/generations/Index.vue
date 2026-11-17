@@ -3,6 +3,7 @@ import { Head, Link, usePoll } from '@inertiajs/vue3';
 import { computed, reactive, watch } from 'vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { describeExpiry } from '@/lib/expiry';
+import { isUnfinished } from '@/lib/generationStatus';
 import { formatMoneyRange } from '@/lib/money';
 import { useNow } from '@/lib/useNow';
 import type { GenerationItem, GenerationStatus, Paginated } from '@/types';
@@ -11,11 +12,9 @@ const props = defineProps<{
     generations: Paginated<GenerationItem>;
 }>();
 
-const inProgress: GenerationStatus[] = ['pending', 'queued', 'processing'];
-
 const hasInProgress = computed(() =>
     props.generations.data.some((generation) =>
-        inProgress.includes(generation.status),
+        isUnfinished(generation.status),
     ),
 );
 

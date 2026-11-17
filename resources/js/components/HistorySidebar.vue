@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Link, usePage, usePoll } from '@inertiajs/vue3';
 import { computed, watch } from 'vue';
+import { isUnfinished } from '@/lib/generationStatus';
 import type { GenerationStatus, RecentGeneration } from '@/types';
 
 const props = defineProps<{
@@ -8,8 +9,6 @@ const props = defineProps<{
 }>();
 
 const page = usePage();
-
-const inProgress: GenerationStatus[] = ['pending', 'queued', 'processing'];
 
 /**
  * Keep the status dots live while anything is still running, refreshing only the sidebar's data.
@@ -22,9 +21,7 @@ const { start, stop } = usePoll(
 
 watch(
     () =>
-        props.generations.some((generation) =>
-            inProgress.includes(generation.status),
-        ),
+        props.generations.some((generation) => isUnfinished(generation.status)),
     (active) => (active ? start() : stop()),
     { immediate: true },
 );

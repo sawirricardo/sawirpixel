@@ -14,6 +14,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import { useCreditsDialog } from '@/lib/creditsDialog';
 import { describeExpiry } from '@/lib/expiry';
 import { allowedValue, restrictOptions } from '@/lib/generationOptions';
+import { isUnfinished } from '@/lib/generationStatus';
 import { formatMoneyRange } from '@/lib/money';
 import { useNow } from '@/lib/useNow';
 import type {
@@ -37,9 +38,8 @@ const page = usePage<SharedProps>();
 const creditsDialog = useCreditsDialog();
 const now = useNow();
 
-const inProgress: GenerationStatus[] = ['pending', 'queued', 'processing'];
 const running = computed(() =>
-    props.thread.some((version) => inProgress.includes(version.status)),
+    props.thread.some((version) => isUnfinished(version.status)),
 );
 
 const { start, stop } = usePoll(
@@ -450,7 +450,7 @@ function versionNumber(version: ThreadVersion): number {
                                 Charged
                                 {{
                                     version.charge?.formatted ??
-                                    (inProgress.includes(version.status)
+                                    (isUnfinished(version.status)
                                         ? 'when finished'
                                         : '—')
                                 }}
