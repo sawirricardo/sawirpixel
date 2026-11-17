@@ -96,11 +96,12 @@ final class SubmitGeneration implements ShouldBeUnique, ShouldQueue
     }
 
     /**
-     * Give up once retries run out; the generation was never accepted, so it costs nothing.
+     * Give up once retries run out. As far as we know it was never accepted, so it costs nothing; if
+     * Pixelforge did accept it and reports later, that report wins (an unconfirmed failure).
      */
     public function failed(?Throwable $exception): void
     {
-        $this->markFailed('submission_failed');
+        $this->markFailed(Generation::UNCONFIRMED_FAILURE);
     }
 
     private function submit(PixelforgeClient $client, Generation $generation): void

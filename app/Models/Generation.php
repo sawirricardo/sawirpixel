@@ -46,6 +46,12 @@ final class Generation extends Model
     use HasFactory;
 
     /**
+     * The error code of a failure we declared ourselves after giving up on submitting, without hearing
+     * from Pixelforge. Pixelforge can still overturn it; see GenerationStatus.
+     */
+    public const string UNCONFIRMED_FAILURE = 'submission_failed';
+
+    /**
      * @var array<string, string>
      */
     protected $casts = [
@@ -74,8 +80,9 @@ final class Generation extends Model
     {
         self::updating(function (Generation $generation): void {
             $from = $generation->getOriginal('status');
+            $unconfirmedFailure = $from === GenerationStatus::Failed && $generation->getOriginal('error_code') === self::UNCONFIRMED_FAILURE;
 
-            if ($generation->isDirty('status') && $from instanceof GenerationStatus && ! $from->canTransitionTo($generation->status)) {
+            if ($generation->isDirty('status') && $from instanceof GenerationStatus && ! $from->canTransitionTo($generation->status, $unconfirmedFailure)) {
                 throw InvalidStatusTransitionException::between('A generation', $from, $generation->status);
             }
         });
@@ -88,6 +95,20 @@ final class Generation extends Model
     {
         // Generations outlive a deleted organization as billing records.
         return $this->belongsTo(Organization::class)->withTrashed();
+    }
+
+    public function isUnconfirmedFailure(): bool
+    {
+        return $this->status === GenerationStatus::Failed && $this->error_code === self::UNCONFIRMED_FAILURE;
+    }
+
+    /**
+     * Whether a report from Pixelforge may move it to this status: forward only, except that an
+     * unconfirmed failure may still be overturned.
+     */
+    public function canMoveTo(GenerationStatus $next): bool
+    {
+        return $this->status->canTransitionTo($next, $this->isUnconfirmedFailure());
     }
 
     /**

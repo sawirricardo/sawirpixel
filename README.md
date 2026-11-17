@@ -152,7 +152,7 @@ Pixelforge's test directives make each scenario predictable. Put one at the star
 | Pixelforge's concurrency limit of 3 in flight | The generation waits for a free slot instead of failing. |
 | Daily limit reached | The generation fails with an explanation, and the hold is returned. |
 | Fails during processing | The app marks it failed when the result arrives and charges nothing. |
-| Never accepted after an hour of retries | The generation fails, and the hold is returned. |
+| Never accepted after an hour of retries | The generation fails, and the hold is returned. If Pixelforge reports later that it made the image after all, the app charges the real cost once and shows the image. |
 | Duplicate, late or out-of-order webhooks | The status machine ignores them, because it only moves forward. |
 | Webhook missed entirely | Polling or the 5-minute reconciliation finds the result. |
 | Not enough credits, or over an organization limit | The app refuses before submitting and shows the reason as you type. |
@@ -238,7 +238,7 @@ Each lifecycle that drives behaviour is explicit, with its diagram in a docblock
 ## Tests and quality gates
 
 ```bash
-php artisan test --compact      # 435 tests, on SQLite; all pass on Postgres too
+php artisan test --compact      # 441 tests, on SQLite; all pass on Postgres too
 composer test                   # everything below, then the suite
 composer test:types             # PHPStan (Larastan, level max)
 composer test:type-coverage     # 100% type coverage

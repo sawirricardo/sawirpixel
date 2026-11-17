@@ -40,10 +40,14 @@ final readonly class ApplyPixelforgeGeneration
             $locked->pixelforge_id ??= $snapshot->id;
 
             // A repeated or out-of-date report: keep what we know, but still record the Pixelforge id.
-            if (! $locked->status->canTransitionTo($status)) {
+            if (! $locked->canMoveTo($status)) {
                 $locked->save();
 
                 return $locked;
+            }
+
+            if ($locked->isUnconfirmedFailure()) {
+                $this->revive($locked);
             }
 
             $locked->status = $status;
@@ -65,6 +69,20 @@ final readonly class ApplyPixelforgeGeneration
 
             return $locked;
         });
+    }
+
+    /**
+     * We gave up on this generation without hearing from Pixelforge, but Pixelforge has now reported on
+     * it, so it did make it. Forget the failure we assumed; the report that follows records what really
+     * happened, and a success is charged its real cost like any other (its hold was already returned).
+     */
+    private function revive(Generation $generation): void
+    {
+        $generation->error_code = null;
+        $generation->error_message = null;
+        $generation->provider_cost = null;
+        $generation->charge = null;
+        $generation->completed_at = null;
     }
 
     /**

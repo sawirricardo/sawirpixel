@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\CreditTransactionType;
 use App\Enums\GenerationStatus;
+use App\Jobs\SubmitGeneration;
 use App\Models\CreditTransaction;
 use App\Models\Generation;
 use App\Models\Organization;
@@ -12,6 +13,7 @@ use App\Services\Billing\CreditLedger;
 use Brick\Math\BigDecimal;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Testing\TestResponse;
 
 beforeEach(function (): void {
@@ -224,4 +226,86 @@ test('surfaces a database conflict that is not a repeated event instead of ackno
 
     expect($generation->refresh()->status)->toBe(GenerationStatus::Queued);
     PixelforgeWebhookEvent::flushEventListeners();
+});
+
+describe('a generation we gave up on', function (): void {
+    /**
+     * A generation submitted through the app (so its maximum is held), whose submission we then gave up
+     * on after the retries ran out, without ever hearing from Pixelforge.
+     */
+    function abandonedGeneration(): Generation
+    {
+        fakePixelforgePricing();
+        Queue::fake([SubmitGeneration::class]);
+        $user = organizationOwner();
+        fundOrganization($user->currentOrganization, '5');
+        test()->actingAs($user)->post(route('generations.store'), ['prompt' => 'A lighthouse', 'size' => '1536x1024', 'quality' => 'high']);
+        $generation = Generation::query()->sole();
+        (new SubmitGeneration($generation))->failed(null);
+
+        return $generation->refresh();
+    }
+
+    test('is charged its real cost, once, if Pixelforge reports that it made it after all', function (): void {
+        $generation = abandonedGeneration();
+        expect($generation->status)->toBe(GenerationStatus::Failed);
+        expect($generation->isUnconfirmedFailure())->toBeTrue();
+
+        $late = pixelforgeGenerationPayload('succeeded', ['id' => 'gen_late', 'metadata' => ['generation_id' => (string) $generation->id]]);
+
+        deliverPixelforgeEvent('evt_late', 'generation.succeeded', $late)->assertOk();
+        deliverPixelforgeEvent('evt_late', 'generation.succeeded', $late)->assertOk();
+        deliverPixelforgeEvent('evt_late_again', 'generation.succeeded', $late)->assertOk();
+
+        $generation->refresh();
+        expect($generation->status)->toBe(GenerationStatus::Succeeded);
+        expect($generation->pixelforge_id)->toBe('gen_late');
+        expect($generation->provider_cost)->toBe('0.305510000');
+        expect($generation->charge)->toBe('0.3818875000');
+        expect($generation->error_code)->toBeNull();
+        expect($generation->error_message)->toBeNull();
+        expect(CreditTransaction::query()->where('generation_id', $generation->id)->orderBy('id')->pluck('type')->all())
+            ->toBe([CreditTransactionType::Hold, CreditTransactionType::HoldRelease, CreditTransactionType::Charge]);
+        expect($generation->organization->refresh()->credit_balance)->toBe('4.6181125000');
+        expectBalanceMatchesLedger($generation->organization);
+    });
+
+    test('goes back in progress if Pixelforge is still working on it, then is charged when it finishes', function (): void {
+        $generation = abandonedGeneration();
+        $metadata = ['metadata' => ['generation_id' => (string) $generation->id]];
+
+        deliverPixelforgeEvent('evt_processing', 'generation.processing', pixelforgeGenerationPayload('processing', ['id' => 'gen_late', ...$metadata]))->assertOk();
+
+        $generation->refresh();
+        expect($generation->status)->toBe(GenerationStatus::Processing);
+        expect($generation->charge)->toBeNull();
+        expect($generation->completed_at)->toBeNull();
+
+        deliverPixelforgeEvent('evt_succeeded', 'generation.succeeded', pixelforgeGenerationPayload('succeeded', ['id' => 'gen_late', ...$metadata]))->assertOk();
+
+        expect($generation->refresh()->charge)->toBe('0.3818875000');
+    });
+
+    test('stays free if Pixelforge reports that it failed', function (): void {
+        $generation = abandonedGeneration();
+
+        deliverPixelforgeEvent('evt_failed', 'generation.failed', pixelforgeGenerationPayload('failed', ['id' => 'gen_late', 'metadata' => ['generation_id' => (string) $generation->id]]))->assertOk();
+
+        $generation->refresh();
+        expect($generation->status)->toBe(GenerationStatus::Failed);
+        expect($generation->charge)->toBe('0.0000000000');
+        expect(CreditTransaction::query()->where('generation_id', $generation->id)->where('type', CreditTransactionType::Charge)->exists())->toBeFalse();
+    });
+});
+
+test('keeps a failure Pixelforge itself reported, whatever arrives later', function (): void {
+    $generation = Generation::factory()->queued()->create(['pixelforge_id' => 'gen_1']);
+    deliverPixelforgeEvent('evt_failed', 'generation.failed', pixelforgeGenerationPayload('failed'))->assertOk();
+
+    deliverPixelforgeEvent('evt_succeeded', 'generation.succeeded', pixelforgeGenerationPayload('succeeded'))->assertOk();
+
+    $generation->refresh();
+    expect($generation->status)->toBe(GenerationStatus::Failed);
+    expect($generation->charge)->toBe('0.0000000000');
+    expect(CreditTransaction::query()->where('generation_id', $generation->id)->where('type', CreditTransactionType::Charge)->exists())->toBeFalse();
 });

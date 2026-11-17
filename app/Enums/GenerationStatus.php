@@ -19,6 +19,11 @@ use App\Enums\Pixelforge\GenerationStatus as PixelforgeStatus;
  *
  * Status only moves forward, and may skip steps: a webhook or poll can report a finished generation we
  * last saw as Pending or Queued. An older or repeated report is ignored rather than moving it back.
+ *
+ * One exception. When we give up submitting after an hour of errors, we mark the generation Failed
+ * without having heard from Pixelforge: an unconfirmed failure. Pixelforge may still have made it (its
+ * reply could have been lost), so if it later reports Queued, Processing or Succeeded, that report wins
+ * and the real cost is charged. Every other failure is Pixelforge's own answer and stays final.
  */
 enum GenerationStatus: string
 {
@@ -74,8 +79,15 @@ enum GenerationStatus: string
         };
     }
 
-    public function canTransitionTo(self $next): bool
+    /**
+     * @param  bool  $unconfirmedFailure  Whether this is a failure we declared without hearing from Pixelforge.
+     */
+    public function canTransitionTo(self $next, bool $unconfirmedFailure = false): bool
     {
+        if ($unconfirmedFailure && $this === self::Failed) {
+            return in_array($next, [self::Queued, self::Processing, self::Succeeded], true);
+        }
+
         return in_array($next, $this->transitions(), true);
     }
 
