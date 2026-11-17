@@ -213,7 +213,7 @@ const success = computed(() => {
                     </div>
                 </nav>
             </header>
-            <main class="mx-auto max-w-5xl px-6 py-10">
+            <main class="mx-auto w-full max-w-5xl px-6 py-10">
                 <div
                     v-if="
                         auth.user &&

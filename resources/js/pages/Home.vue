@@ -378,7 +378,7 @@ function onKeydown(event: KeyboardEvent): void {
     <AppLayout>
         <Head title="Generate" />
         <div
-            class="mx-auto flex min-h-[70vh] max-w-3xl flex-col justify-center"
+            class="mx-auto flex min-h-[70vh] max-w-4xl flex-col justify-center"
         >
             <h1 class="mb-8 text-center text-3xl font-semibold tracking-tight">
                 What do you want to create?

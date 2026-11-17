@@ -261,7 +261,7 @@ function versionNumber(version: ThreadVersion): number {
 <template>
     <AppLayout>
         <Head :title="(thread[0]?.prompt ?? generation.prompt).slice(0, 40)" />
-        <div class="mx-auto max-w-3xl pb-48">
+        <div class="mx-auto max-w-4xl pb-48">
             <details
                 v-if="versions.length > 1"
                 class="mb-8 rounded-2xl border border-zinc-200 bg-white"
@@ -502,7 +502,7 @@ function versionNumber(version: ThreadVersion): number {
         </div>
 
         <div class="fixed inset-x-0 bottom-0 z-20 lg:left-64">
-            <div class="mx-auto max-w-3xl px-6 pb-6">
+            <div class="mx-auto max-w-4xl px-6 pb-6">
                 <form
                     class="rounded-3xl border border-zinc-200 bg-white shadow-lg"
                     @submit.prevent="send"
