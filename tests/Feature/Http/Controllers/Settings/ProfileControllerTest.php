@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 use App\Models\User;
+use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Notification;
 use Inertia\Testing\AssertableInertia as Assert;
 
 test('shows the user their profile', function (): void {
@@ -15,16 +17,19 @@ test('shows the user their profile', function (): void {
 });
 
 test('updates the name and keeps the email verified when it does not change', function (): void {
+    Notification::fake();
     $user = User::factory()->create(['email' => 'ada@example.com']);
 
     $this->actingAs($user)->patch(route('profile.update'), ['name' => 'Ada Lovelace', 'email' => 'ada@example.com'])->assertSessionHasNoErrors();
+    Notification::assertNothingSent();
 
     $user->refresh();
     expect($user->name)->toBe('Ada Lovelace');
     expect($user->email_verified_at)->not->toBeNull();
 });
 
-test('marks a changed email as unverified', function (): void {
+test('marks a changed email as unverified and sends a link to the new address', function (): void {
+    Notification::fake();
     $user = User::factory()->create(['email' => 'ada@example.com']);
 
     $this->actingAs($user)->patch(route('profile.update'), ['name' => $user->name, 'email' => 'ada@new.example'])->assertSessionHasNoErrors();
@@ -32,6 +37,7 @@ test('marks a changed email as unverified', function (): void {
     $user->refresh();
     expect($user->email)->toBe('ada@new.example');
     expect($user->email_verified_at)->toBeNull();
+    Notification::assertSentTo($user, VerifyEmail::class);
 });
 
 test('rejects an email that belongs to someone else', function (): void {

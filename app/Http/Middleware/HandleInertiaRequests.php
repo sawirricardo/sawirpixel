@@ -45,6 +45,7 @@ final class HandleInertiaRequests extends Middleware
                     'name' => $user->name,
                     'email' => $user->email,
                     'is_super_admin' => $user->isSuperAdmin(),
+                    'email_verified' => $user->hasVerifiedEmail(),
                 ] : null,
                 'credits' => fn (): ?array => $user instanceof User && $user->currentOrganization instanceof Organization ? [
                     'balance' => Money::toArray($user->currentOrganization->credit_balance),

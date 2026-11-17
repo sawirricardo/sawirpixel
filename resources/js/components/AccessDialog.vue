@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useForm } from '@inertiajs/vue3';
+import { Link, useForm } from '@inertiajs/vue3';
 import { computed, nextTick, ref, watch } from 'vue';
 import { useAccessDialog } from '@/lib/accessDialog';
 
@@ -209,6 +209,13 @@ const primaryClass =
                         >
                             {{ login.errors.password }}
                         </p>
+                        <Link
+                            href="/forgot-password"
+                            class="mt-1 inline-block text-xs text-zinc-500 hover:text-zinc-900"
+                            @click="open = false"
+                        >
+                            Forgot password?
+                        </Link>
                     </div>
                     <button
                         type="submit"

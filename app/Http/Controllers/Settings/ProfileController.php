@@ -25,7 +25,7 @@ final class ProfileController
     }
 
     /**
-     * Changing the email address marks it unverified again.
+     * Changing the email address marks it unverified and sends a verification link to the new one.
      */
     public function update(UpdateProfileRequest $request, #[CurrentUser] User $user): RedirectResponse
     {
@@ -34,13 +34,21 @@ final class ProfileController
             'email' => $request->string('email')->value(),
         ]);
 
-        if ($user->isDirty('email')) {
+        $emailChanged = $user->isDirty('email');
+
+        if ($emailChanged) {
             $user->email_verified_at = null;
         }
 
         $user->save();
 
-        Inertia::flash('success', 'Profile updated.');
+        if ($emailChanged) {
+            $user->sendEmailVerificationNotification();
+        }
+
+        Inertia::flash('success', $emailChanged
+            ? sprintf('Profile updated. We sent a verification link to %s.', $user->email)
+            : 'Profile updated.');
 
         return back();
     }

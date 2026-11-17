@@ -5,8 +5,13 @@ declare(strict_types=1);
 use App\Http\Controllers\Admin\ProfitReportController;
 use App\Http\Controllers\Admin\ProfitReportExportController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
+use App\Http\Controllers\Auth\EmailVerificationNoticeController;
+use App\Http\Controllers\Auth\EmailVerificationNotificationController;
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\Auth\NewPasswordController;
+use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Auth\RegisterController;
+use App\Http\Controllers\Auth\VerifyEmailController;
 use App\Http\Controllers\CreditController;
 use App\Http\Controllers\CreditPurchaseController;
 use App\Http\Controllers\CurrentOrganizationController;
@@ -33,7 +38,7 @@ Route::post('/webhooks/pixelforge', PixelforgeWebhookController::class)->name('w
 
 Route::get('/invitations/{token}', [InvitationAcceptanceController::class, 'show'])->name('invitations.show');
 Route::post('/invitations/{token}', [InvitationAcceptanceController::class, 'store'])
-    ->middleware(['auth', 'throttle:10,1'])
+    ->middleware(['auth', 'verified', 'throttle:10,1'])
     ->name('invitations.accept');
 
 Route::middleware('guest')->group(function (): void {
@@ -41,17 +46,26 @@ Route::middleware('guest')->group(function (): void {
     Route::post('/login', [LoginController::class, 'store']);
     Route::get('/register', [RegisterController::class, 'create'])->name('register');
     Route::post('/register', [RegisterController::class, 'store']);
+
+    Route::get('/forgot-password', [PasswordResetLinkController::class, 'create'])->name('password.request');
+    Route::post('/forgot-password', [PasswordResetLinkController::class, 'store'])->middleware('throttle:6,1')->name('password.email');
+    Route::get('/reset-password/{token}', [NewPasswordController::class, 'create'])->name('password.reset');
+    Route::post('/reset-password', [NewPasswordController::class, 'store'])->middleware('throttle:6,1')->name('password.store');
 });
 
 Route::middleware('auth')->group(function (): void {
     Route::post('/logout', [LoginController::class, 'destroy'])->name('logout');
+
+    Route::get('/email/verify', EmailVerificationNoticeController::class)->name('verification.notice');
+    Route::get('/email/verify/{id}/{hash}', VerifyEmailController::class)->middleware(['signed', 'throttle:6,1'])->name('verification.verify');
+    Route::post('/email/verification-notification', [EmailVerificationNotificationController::class, 'store'])->middleware('throttle:6,1')->name('verification.send');
 
     Route::get('/settings/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/settings/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::put('/settings/password', [PasswordController::class, 'update'])->middleware('throttle:6,1')->name('password.update');
 
     Route::get('/credits', [CreditController::class, 'index'])->name('credits.index');
-    Route::post('/credits/purchases', CreditPurchaseController::class)->middleware('throttle:20,1')->name('credits.purchase');
+    Route::post('/credits/purchases', CreditPurchaseController::class)->middleware(['verified', 'throttle:20,1'])->name('credits.purchase');
 
     Route::get('/organizations/create', [OrganizationController::class, 'create'])->name('organizations.create');
     Route::post('/organizations', [OrganizationController::class, 'store'])->name('organizations.store');
@@ -69,7 +83,7 @@ Route::middleware('auth')->group(function (): void {
     Route::delete('/organization/invitations/{invitation}', [InvitationController::class, 'destroy'])->name('invitations.destroy');
 
     Route::get('/generations', [GenerationController::class, 'index'])->name('generations.index');
-    Route::post('/generations', [GenerationController::class, 'store'])->name('generations.store');
+    Route::post('/generations', [GenerationController::class, 'store'])->middleware('verified')->name('generations.store');
     Route::get('/generations/{generation}', [GenerationController::class, 'show'])->name('generations.show');
 
 });

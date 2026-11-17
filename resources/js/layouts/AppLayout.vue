@@ -192,6 +192,28 @@ const success = computed(() => {
                 </nav>
             </header>
             <main class="mx-auto max-w-5xl px-6 py-10">
+                <div
+                    v-if="
+                        auth.user &&
+                        !auth.user.email_verified &&
+                        page.component !== 'auth/VerifyEmail'
+                    "
+                    class="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+                    role="status"
+                >
+                    <span>
+                        Verify your email to generate images. We sent a link to
+                        {{ auth.user.email }}.
+                    </span>
+                    <Link
+                        href="/email/verification-notification"
+                        method="post"
+                        as="button"
+                        class="font-medium underline hover:no-underline"
+                    >
+                        Send it again
+                    </Link>
+                </div>
                 <p
                     v-if="success"
                     class="mb-6 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"

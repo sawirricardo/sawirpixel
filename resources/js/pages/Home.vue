@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, useForm, useHttp, usePage } from '@inertiajs/vue3';
+import { Head, router, useForm, useHttp, usePage } from '@inertiajs/vue3';
 import {
     computed,
     nextTick,
@@ -301,6 +301,12 @@ function submit(): void {
                 purpose: 'generate',
             });
         }
+
+        return;
+    }
+
+    if (!page.props.auth.user?.email_verified) {
+        router.visit('/email/verify');
 
         return;
     }
