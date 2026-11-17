@@ -12,6 +12,12 @@ import PillMenu from '@/components/PillMenu.vue';
 import type { PillOption } from '@/components/PillMenu.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { useAccessDialog } from '@/lib/accessDialog';
+import {
+    composerState,
+    sendIsDisabled,
+    unhandledState,
+} from '@/lib/composerState';
+import type { ComposerState } from '@/lib/composerState';
 import { useCreditsDialog } from '@/lib/creditsDialog';
 import { allowedValue, restrictOptions } from '@/lib/generationOptions';
 import { formatMoneyRange } from '@/lib/money';
@@ -76,22 +82,18 @@ const access = useAccessDialog();
 const creditsDialog = useCreditsDialog();
 
 /**
- * True once the estimate says the organization's balance can't cover the most this could cost.
+ * What pressing send does right now; see lib/composerState.ts.
  */
-const cannotAfford = computed(
-    () =>
-        props.canGenerate &&
-        estimate.response?.affordable === false &&
-        !estimate.hasErrors,
-);
-
-/**
- * Why the organization's limits would refuse this right now (a spending or image cap), if they would.
- */
-const limitBlocked = computed(() =>
-    props.canGenerate && !estimate.hasErrors
-        ? (estimate.response?.blocked ?? null)
-        : null,
+const state = computed<ComposerState>(() =>
+    composerState({
+        signedIn: auth.value.user !== null,
+        hasOrganization: auth.value.organization !== null,
+        canGenerate: props.canGenerate,
+        emailVerified: auth.value.user?.email_verified === true,
+        canBuyCredits: auth.value.credits?.canBuy === true,
+        estimate:
+            estimate.response && !estimate.hasErrors ? estimate.response : null,
+    }),
 );
 
 // Never leave a restricted quality or size selected, e.g. from a restored draft.
@@ -320,7 +322,10 @@ const firstError = computed(
 );
 
 const canSubmit = computed(
-    () => form.prompt.trim() !== '' && !form.processing && !limitBlocked.value,
+    () =>
+        form.prompt.trim() !== '' &&
+        !form.processing &&
+        !sendIsDisabled(state.value),
 );
 
 function submit(): void {
@@ -328,42 +333,39 @@ function submit(): void {
         return;
     }
 
-    if (!props.canGenerate) {
-        if (auth.value.user && auth.value.organization) {
+    const current = state.value;
+
+    switch (current.kind) {
+        case 'needs-account':
+            access.show('login', { purpose: 'generate' });
+            return;
+        case 'needs-organization':
+            access.show('organization', { purpose: 'generate' });
+            return;
+        case 'no-permission':
             noPermission.value = true;
-        } else {
-            access.show(auth.value.user ? 'organization' : 'login', {
-                purpose: 'generate',
+            return;
+        case 'needs-verification':
+            router.visit('/email/verify');
+            return;
+        case 'unaffordable':
+            if (current.canBuyCredits) {
+                creditsDialog.show();
+            }
+            return;
+        case 'parent-unavailable':
+        case 'blocked':
+            return;
+        case 'ready':
+            readyMessage.value = null;
+            form.post('/generations', {
+                preserveScroll: true,
+                onSuccess: () => sessionStorage.removeItem(DRAFT_KEY),
             });
-        }
-
-        return;
+            return;
+        default:
+            unhandledState(current);
     }
-
-    if (!page.props.auth.user?.email_verified) {
-        router.visit('/email/verify');
-
-        return;
-    }
-
-    if (limitBlocked.value) {
-        return;
-    }
-
-    if (cannotAfford.value) {
-        if (page.props.auth.credits?.canBuy) {
-            creditsDialog.show();
-        }
-
-        return;
-    }
-
-    readyMessage.value = null;
-
-    form.post('/generations', {
-        preserveScroll: true,
-        onSuccess: () => sessionStorage.removeItem(DRAFT_KEY),
-    });
 }
 
 function onKeydown(event: KeyboardEvent): void {
@@ -625,15 +627,15 @@ function onKeydown(event: KeyboardEvent): void {
             </p>
 
             <p
-                v-if="limitBlocked && !firstError"
+                v-if="state.kind === 'blocked' && !firstError"
                 class="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-900"
                 role="status"
             >
-                {{ limitBlocked }}
+                {{ state.reason }}
             </p>
 
             <div
-                v-else-if="cannotAfford && estimate.response"
+                v-else-if="state.kind === 'unaffordable' && estimate.response"
                 class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-900"
                 role="status"
             >

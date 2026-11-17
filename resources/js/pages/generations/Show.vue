@@ -11,6 +11,12 @@ import {
 import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue';
 import PillMenu from '@/components/PillMenu.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
+import {
+    composerState,
+    sendIsDisabled,
+    unhandledState,
+} from '@/lib/composerState';
+import type { ComposerState } from '@/lib/composerState';
 import { useCreditsDialog } from '@/lib/creditsDialog';
 import { describeExpiry } from '@/lib/expiry';
 import { allowedValue, restrictOptions } from '@/lib/generationOptions';
@@ -207,17 +213,28 @@ watch(
     { immediate: true },
 );
 
-/** Why the organization's limits would refuse this follow-up, if they would. */
-const limitBlocked = computed(() =>
-    estimate.hasErrors ? null : (estimate.response?.blocked ?? null),
+/**
+ * What pressing send does right now; see lib/composerState.ts. Only signed-in members of the
+ * organization reach this page, so permission is left to the server to enforce.
+ */
+const state = computed<ComposerState>(() =>
+    composerState({
+        signedIn: true,
+        hasOrganization: true,
+        canGenerate: true,
+        emailVerified: page.props.auth.user?.email_verified === true,
+        canBuyCredits: page.props.auth.credits?.canBuy === true,
+        estimate:
+            estimate.response && !estimate.hasErrors ? estimate.response : null,
+        parentContinuable: parent.value?.can_continue === true,
+    }),
 );
 
 const canSend = computed(
     () =>
-        !limitBlocked.value &&
         form.prompt.trim() !== '' &&
         !form.processing &&
-        parent.value?.can_continue === true,
+        !sendIsDisabled(state.value),
 );
 
 function send(): void {
@@ -225,25 +242,33 @@ function send(): void {
         return;
     }
 
-    if (!page.props.auth.user?.email_verified) {
-        router.visit('/email/verify');
+    const current = state.value;
 
-        return;
+    switch (current.kind) {
+        case 'needs-verification':
+            router.visit('/email/verify');
+            return;
+        case 'unaffordable':
+            if (current.canBuyCredits) {
+                creditsDialog.show();
+            }
+            return;
+        case 'needs-account':
+        case 'needs-organization':
+        case 'no-permission':
+        case 'parent-unavailable':
+        case 'blocked':
+            return;
+        case 'ready':
+            form.parent_id = parent.value.id;
+            form.post('/generations', {
+                preserveScroll: true,
+                onSuccess: () => form.reset('prompt'),
+            });
+            return;
+        default:
+            unhandledState(current);
     }
-
-    if (estimate.response?.affordable === false) {
-        if (page.props.auth.credits?.canBuy) {
-            creditsDialog.show();
-        }
-
-        return;
-    }
-
-    form.parent_id = parent.value.id;
-    form.post('/generations', {
-        preserveScroll: true,
-        onSuccess: () => form.reset('prompt'),
-    });
 }
 
 function onKeydown(event: KeyboardEvent): void {
@@ -619,14 +644,14 @@ function versionNumber(version: ThreadVersion): number {
                     {{ firstError }}
                 </p>
                 <p
-                    v-else-if="limitBlocked"
+                    v-else-if="state.kind === 'blocked'"
                     class="mt-2 px-2 text-sm text-amber-800"
                     role="status"
                 >
-                    {{ limitBlocked }}
+                    {{ state.reason }}
                 </p>
                 <p
-                    v-else-if="estimate.response?.affordable === false"
+                    v-else-if="state.kind === 'unaffordable'"
                     class="mt-2 px-2 text-sm text-amber-800"
                     role="status"
                 >
