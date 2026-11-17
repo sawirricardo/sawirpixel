@@ -22,7 +22,7 @@ final class RoleFactory extends Factory
     {
         return [
             'organization_id' => Organization::factory(),
-            'name' => fake()->unique()->jobTitle(),
+            'name' => 'Custom '.fake()->unique()->jobTitle(),
         ];
     }
 }
