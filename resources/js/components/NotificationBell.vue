@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Link, router } from '@inertiajs/vue3';
 import { onBeforeUnmount, onMounted, ref } from 'vue';
+import { relativeTime } from '@/lib/relativeTime';
 import type { AppNotification } from '@/types';
 
 defineProps<{
@@ -17,27 +18,7 @@ const icon: Record<string, string> = {
 };
 
 function timeAgo(date: string | null): string {
-    if (!date) {
-        return '';
-    }
-
-    const seconds = Math.max(0, (Date.now() - new Date(date).getTime()) / 1000);
-
-    if (seconds < 60) {
-        return 'just now';
-    }
-
-    const units: [number, Intl.RelativeTimeFormatUnit][] = [
-        [86400, 'day'],
-        [3600, 'hour'],
-        [60, 'minute'],
-    ];
-    const [size, unit] = units.find(([size]) => seconds >= size) ?? units[2];
-
-    return new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' }).format(
-        -Math.floor(seconds / size),
-        unit,
-    );
+    return date ? relativeTime(date) : '';
 }
 
 function markAllRead(): void {

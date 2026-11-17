@@ -31,7 +31,9 @@ use App\Http\Controllers\PixelforgeWebhookController;
 use App\Http\Controllers\ReceivedInvitationController;
 use App\Http\Controllers\RobotsController;
 use App\Http\Controllers\Settings\PasswordController;
+use App\Http\Controllers\Settings\PersonalAccessTokenController;
 use App\Http\Controllers\Settings\ProfileController;
+use App\Http\Controllers\Settings\RegeneratePersonalAccessTokenController;
 use App\Http\Controllers\SitemapController;
 use App\Http\Middleware\NoIndex;
 use Illuminate\Support\Facades\Route;
@@ -81,6 +83,10 @@ Route::middleware(['auth', NoIndex::class])->group(function (): void {
     Route::get('/settings/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/settings/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::put('/settings/password', [PasswordController::class, 'update'])->middleware('throttle:6,1')->name('password.update');
+    Route::post('/settings/tokens', [PersonalAccessTokenController::class, 'store'])->middleware('throttle:20,1')->name('tokens.store');
+    Route::patch('/settings/tokens/{token}', [PersonalAccessTokenController::class, 'update'])->name('tokens.update');
+    Route::delete('/settings/tokens/{token}', [PersonalAccessTokenController::class, 'destroy'])->name('tokens.destroy');
+    Route::post('/settings/tokens/{token}/regenerate', RegeneratePersonalAccessTokenController::class)->middleware('throttle:20,1')->name('tokens.regenerate');
 
     Route::get('/credits', [CreditController::class, 'index'])->name('credits.index');
     Route::post('/credits/purchases', CreditPurchaseController::class)->middleware(['verified', 'throttle:20,1'])->name('credits.purchase');

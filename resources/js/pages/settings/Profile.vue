@@ -1,9 +1,16 @@
 <script setup lang="ts">
 import { Head, useForm } from '@inertiajs/vue3';
+import PersonalAccessTokens from '@/components/PersonalAccessTokens.vue';
+import type {
+    PersonalAccessToken,
+    TokenOptions,
+} from '@/components/PersonalAccessTokens.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 
 const props = defineProps<{
     profile: { name: string; email: string; email_verified: boolean };
+    tokens: PersonalAccessToken[];
+    tokenOptions: TokenOptions;
 }>();
 
 const details = useForm({
@@ -40,7 +47,7 @@ const inputClass =
 <template>
     <AppLayout>
         <Head title="Your profile" />
-        <div class="mx-auto max-w-xl space-y-8">
+        <div class="mx-auto max-w-2xl space-y-8">
             <h1 class="text-2xl font-semibold">Your profile</h1>
 
             <form
@@ -167,6 +174,8 @@ const inputClass =
                     Change password
                 </button>
             </form>
+
+            <PersonalAccessTokens :tokens="tokens" :options="tokenOptions" />
         </div>
     </AppLayout>
 </template>
