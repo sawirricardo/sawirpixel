@@ -9,6 +9,7 @@ use App\Models\Generation;
 use App\Services\Reporting\ProfitReport;
 use Brick\Math\BigDecimal;
 use Illuminate\Support\Facades\Gate;
+use RuntimeException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -23,11 +24,7 @@ final class ProfitReportExportController
         $filename = sprintf('generations-%s-to-%s.csv', $request->startDate()->toDateString(), $request->endDate()->toDateString());
 
         return response()->streamDownload(function () use ($report, $request): void {
-            $output = fopen('php://output', 'w');
-
-            if ($output === false) {
-                return;
-            }
+            $output = fopen('php://output', 'w') ?: throw new RuntimeException('Could not open the CSV output stream.');
 
             fputcsv($output, ['completed_at_utc', 'generation_id', 'pixelforge_id', 'organization_id', 'user_id', 'user_email', 'charged_usd', 'provider_cost_usd', 'profit_usd'], escape: '');
 

@@ -159,3 +159,11 @@ test('shares the pixelforge request budget, releasing instead of calling the api
     $limited->assertReleased();
     Http::assertNothingSent();
 });
+
+test('is unique per generation and keeps retrying for an hour', function (): void {
+    $generation = Generation::factory()->create();
+    $job = new SubmitGeneration($generation);
+
+    expect($job->uniqueId())->toBe((string) $generation->id);
+    expect($job->retryUntil()->toDateTimeString())->toBe(now()->addHour()->toDateTimeString());
+});

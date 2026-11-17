@@ -6,6 +6,7 @@ use App\Enums\Pixelforge\ImageQuality;
 use App\Enums\Pixelforge\ImageSize;
 use App\Services\Pricing\GenerationCostEstimator;
 use Brick\Math\BigDecimal;
+use Illuminate\Support\Facades\Http;
 
 test('includes reference images, the output size and the reasoning range in the estimate', function (): void {
     fakePixelforgePricing();
@@ -46,4 +47,14 @@ test('rounds up only beyond ten decimal places', function (): void {
     $estimator = resolve(GenerationCostEstimator::class);
 
     expect((string) $estimator->charge(BigDecimal::of('0.000000001')))->toBe('0.0000000013');
+});
+
+test('refuses to estimate when pixelforge does not publish a price for the combination', function (): void {
+    Http::fake(['pixelforge.promptedit.dev/v1/pricing' => Http::response([
+        'rates' => ['input_text_tokens' => '5.00', 'input_image_tokens' => '10.00', 'output_tokens' => '40.00', 'reasoning_tokens' => '12.50'],
+        'tokens' => ['reasoning' => ['high' => ['min' => 1000, 'max' => 8000]], 'output' => []],
+    ])]);
+
+    expect(fn () => resolve(GenerationCostEstimator::class)->estimate('A lighthouse', ImageSize::Square, ImageQuality::High, 0))
+        ->toThrow(UnexpectedValueException::class, 'Pixelforge pricing is missing [tokens.output.high.1024x1024].');
 });

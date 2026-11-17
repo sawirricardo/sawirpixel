@@ -8,7 +8,10 @@ use App\Exceptions\Pixelforge\PixelforgeException;
 use App\Jobs\PollGeneration;
 use App\Models\Generation;
 use App\Services\Pixelforge\PixelforgeClient;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Pipeline\Pipeline;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\RateLimiter;
 
 beforeEach(function (): void {
     config()->set('services.pixelforge.key', 'pf_test_key');
@@ -78,5 +81,29 @@ test('stops once a webhook has already finished the generation', function (): vo
 
     runPollGeneration(new PollGeneration($generation));
 
+    Http::assertNothingSent();
+});
+
+test('is unique per generation and keeps polling for twenty minutes', function (): void {
+    $generation = Generation::factory()->queued()->create();
+    $job = new PollGeneration($generation);
+
+    expect($job->uniqueId())->toBe((string) $generation->id);
+    expect($job->retryUntil()->toDateTimeString())->toBe(now()->addMinutes(20)->toDateTimeString());
+});
+
+test('shares the pixelforge request budget with submissions', function (): void {
+    Http::fake();
+    RateLimiter::for('pixelforge', fn (): Limit => Limit::perMinute(1));
+    $run = fn (PollGeneration $job) => (new Pipeline(app()))
+        ->send($job)
+        ->through($job->middleware())
+        ->then(fn (PollGeneration $job) => runPollGeneration($job));
+
+    $run((new PollGeneration(Generation::factory()->create()))->withFakeQueueInteractions());
+    $limited = (new PollGeneration(Generation::factory()->queued()->create()))->withFakeQueueInteractions();
+    $run($limited);
+
+    $limited->assertReleased();
     Http::assertNothingSent();
 });

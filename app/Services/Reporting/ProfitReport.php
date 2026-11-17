@@ -42,11 +42,9 @@ final readonly class ProfitReport
         $totals = new ProfitTally;
 
         foreach ($this->billedGenerations($startDate, $endDate)->with('user:id,name,email')->get() as $generation) {
-            $date = $generation->completed_at?->utc()->toDateString();
-
-            if ($date === null || ! isset($days[$date])) {
-                continue;
-            }
+            // The query only returns generations that completed inside the range, so every date has a bucket.
+            $date = (string) $generation->completed_at?->utc()->toDateString();
+            $days[$date] ??= new ProfitTally;
 
             $charged = BigDecimal::of($generation->charge ?? '0');
             $providerCost = BigDecimal::of($generation->provider_cost ?? '0');

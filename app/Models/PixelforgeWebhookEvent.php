@@ -7,7 +7,6 @@ namespace App\Models;
 use Database\Factories\PixelforgeWebhookEventFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * A received Pixelforge webhook event. The unique event id is what guarantees each event is processed once.
@@ -30,12 +29,4 @@ final class PixelforgeWebhookEvent extends Model
     protected $casts = [
         'payload' => 'array',
     ];
-
-    /**
-     * @return BelongsTo<Generation, $this>
-     */
-    public function generation(): BelongsTo
-    {
-        return $this->belongsTo(Generation::class);
-    }
 }
