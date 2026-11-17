@@ -369,7 +369,7 @@ function onKeydown(event: KeyboardEvent): void {
                     v-model="form.prompt"
                     rows="1"
                     :maxlength="maxPromptLength"
-                    placeholder="The quick brown fox jumps over the lazy dog"
+                    placeholder="Describe an image… e.g. A lighthouse on a cliff at dawn, oil painting"
                     class="block max-h-80 min-h-14 w-full resize-none bg-transparent px-5 pt-4 pb-2 text-base placeholder:text-zinc-400 focus:outline-none"
                     @input="autoGrow"
                     @keydown="onKeydown"
