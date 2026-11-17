@@ -116,14 +116,14 @@ Pixelforge's test directives make each scenario deterministic: put one at the st
 
 ### Pricing
 
-- Rates and token tables come from Pixelforge's `GET /v1/pricing` (cached for an hour), not hard-coded.
+- Rates and token tables come from Pixelforge's `GET /v1/pricing`, cached for an hour.
 - The estimate turns the prompt length, size, quality and reference images into a token range, prices
   it, and adds the markup (`PIXELFORGE_MARKUP`, default `1.25`). See
   `app/Services/Pricing/GenerationCostEstimator.php`.
 - The final charge uses the usage and rates Pixelforge reports for that generation, so it's exact.
 - All money is `brick/math` `BigDecimal`: provider costs to 9 decimal places (as Pixelforge reports
-  them), charges to 10. It's never a float, and never SQL arithmetic (SQLite would use floats). It's
-  rounded only for display.
+  them), charges to 10. Money is never a float and never computed in SQL, where SQLite would use
+  floats. It's rounded only for display.
 
 ### Asynchronous generations
 
@@ -244,7 +244,7 @@ classes, strict types, no protected methods, enums and exceptions in their own n
 - **Images aren't stored.** They load from Pixelforge's signed links, which expire after 24 hours;
   the app shows when each one expires, and a version can only be continued while its link is valid.
 - **Hold the maximum, charge the actual.** Users never owe more than the estimate they saw.
-- **Usage is derived, not counted.** Limits and the reconciliation read the generations and the
+- **Usage comes from the records.** Limits and the reconciliation read the generations and the
   ledger themselves, so a late failure or a replayed webhook can't leave a counter wrong.
 - **Customers don't see the provider's internals.** The estimate endpoint returns only the price, and
   failure messages are our own wording. The provider's error code is kept for operators.

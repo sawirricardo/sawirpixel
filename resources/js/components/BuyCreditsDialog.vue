@@ -99,8 +99,8 @@ function closeOnBackdrop(event: MouseEvent): void {
             </Link>
 
             <p class="mt-4 text-xs text-zinc-500">
-                This is a demo checkout: no payment is taken, the credits are
-                simply added.
+                This is a demo checkout: the credits are added and no payment is
+                taken.
             </p>
 
             <div class="mt-5 flex gap-2">
