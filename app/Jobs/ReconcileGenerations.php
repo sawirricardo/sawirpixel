@@ -37,7 +37,7 @@ final class ReconcileGenerations implements ShouldQueue
 
         Generation::query()
             ->whereNotNull('pixelforge_id')
-            ->whereIn('status', [GenerationStatus::Queued, GenerationStatus::Processing])
+            ->whereIn('status', GenerationStatus::atProvider())
             ->where('updated_at', '<', $staleBefore)
             ->each(fn (Generation $generation): PendingDispatch => dispatch(new PollGeneration($generation)));
     }

@@ -21,8 +21,7 @@ use UnexpectedValueException;
  * Records Pixelforge's view of a generation. Polling and webhooks both go through here, so it must be
  * safe to apply the same or an older snapshot any number of times, in any order.
  *
- * Status only moves forward (pending → queued → processing → succeeded|failed) and never leaves a final
- * state, so the cost of a finished generation is recorded exactly once, and the organization's credits are
+ * Status follows GenerationStatus's transitions (forward only, never out of a final state), so the cost of a finished generation is recorded exactly once, and the organization's credits are
  * settled (hold returned, actual cost charged) in the same transaction.
  */
 final readonly class ApplyPixelforgeGeneration
@@ -36,11 +35,12 @@ final readonly class ApplyPixelforgeGeneration
     {
         return DB::transaction(function () use ($generation, $snapshot): Generation {
             $locked = Generation::query()->whereKey($generation->id)->lockForUpdate()->sole();
-            $status = $this->localStatus($snapshot->status);
+            $status = GenerationStatus::fromPixelforge($snapshot->status);
 
             $locked->pixelforge_id ??= $snapshot->id;
 
-            if ($this->isFinal($locked->status) || $this->rank($status) <= $this->rank($locked->status)) {
+            // A repeated or out-of-date report: keep what we know, but still record the Pixelforge id.
+            if (! $locked->status->canTransitionTo($status)) {
                 $locked->save();
 
                 return $locked;
@@ -58,7 +58,7 @@ final readonly class ApplyPixelforgeGeneration
 
             $locked->save();
 
-            if ($this->isFinal($locked->status)) {
+            if ($locked->status->isFinal()) {
                 // Only the snapshot that finishes the generation gets here, so this is sent once.
                 DB::afterCommit(fn () => $locked->user?->notify(new GenerationFinished($locked)));
             }
@@ -115,30 +115,5 @@ final readonly class ApplyPixelforgeGeneration
         $generation->error_code = $snapshot->error?->code;
         $generation->error_message = FailureMessage::for($snapshot->error?->code);
         $generation->completed_at = $snapshot->completedAt ?? now();
-    }
-
-    private function localStatus(PixelforgeStatus $status): GenerationStatus
-    {
-        return match ($status) {
-            PixelforgeStatus::Queued => GenerationStatus::Queued,
-            PixelforgeStatus::Processing => GenerationStatus::Processing,
-            PixelforgeStatus::Succeeded => GenerationStatus::Succeeded,
-            PixelforgeStatus::Failed => GenerationStatus::Failed,
-        };
-    }
-
-    private function isFinal(GenerationStatus $status): bool
-    {
-        return $status === GenerationStatus::Succeeded || $status === GenerationStatus::Failed;
-    }
-
-    private function rank(GenerationStatus $status): int
-    {
-        return match ($status) {
-            GenerationStatus::Pending => 0,
-            GenerationStatus::Queued => 1,
-            GenerationStatus::Processing => 2,
-            GenerationStatus::Succeeded, GenerationStatus::Failed => 3,
-        };
     }
 }

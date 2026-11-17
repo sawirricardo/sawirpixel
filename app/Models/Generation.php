@@ -7,8 +7,10 @@ namespace App\Models;
 use App\Enums\GenerationStatus;
 use App\Enums\Pixelforge\ImageQuality;
 use App\Enums\Pixelforge\ImageSize;
+use App\Exceptions\InvalidStatusTransitionException;
 use Carbon\CarbonInterface;
 use Database\Factories\GenerationFactory;
+use Illuminate\Database\Eloquent\Attributes\Boot;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -60,6 +62,24 @@ final class Generation extends Model
         'submitted_at' => 'datetime',
         'completed_at' => 'datetime',
     ];
+
+    /**
+     * Enforce the status machine on every Eloquent save: an illegal move (say, out of a final state)
+     * throws instead of quietly corrupting billing. Conditional query-builder updates, which
+     * SubmitGeneration uses as its concurrency guard, don't fire model events and check the current
+     * status in their WHERE clause instead.
+     */
+    #[Boot]
+    public static function guardStatusTransitions(): void
+    {
+        self::updating(function (Generation $generation): void {
+            $from = $generation->getOriginal('status');
+
+            if ($generation->isDirty('status') && $from instanceof GenerationStatus && ! $from->canTransitionTo($generation->status)) {
+                throw InvalidStatusTransitionException::between('A generation', $from, $generation->status);
+            }
+        });
+    }
 
     /**
      * @return BelongsTo<Organization, $this>

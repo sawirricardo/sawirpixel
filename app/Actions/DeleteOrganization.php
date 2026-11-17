@@ -30,7 +30,7 @@ final readonly class DeleteOrganization
 
             $inProgress = Generation::query()
                 ->whereBelongsTo($organization)
-                ->whereIn('status', [GenerationStatus::Pending, GenerationStatus::Queued, GenerationStatus::Processing])
+                ->whereIn('status', GenerationStatus::unfinished())
                 ->count();
 
             if ($inProgress > 0) {

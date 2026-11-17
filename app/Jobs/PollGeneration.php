@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Jobs;
 
 use App\Actions\ApplyPixelforgeGeneration;
-use App\Enums\GenerationStatus;
 use App\Exceptions\Pixelforge\PixelforgeException;
 use App\Models\Generation;
 use App\Services\Pixelforge\PixelforgeClient;
@@ -52,7 +51,7 @@ final class PollGeneration implements ShouldBeUnique, ShouldQueue
     {
         $generation = $this->generation->refresh();
 
-        if ($generation->pixelforge_id === null || $this->isFinal($generation->status)) {
+        if ($generation->pixelforge_id === null || $generation->status->isFinal()) {
             return;
         }
 
@@ -71,13 +70,8 @@ final class PollGeneration implements ShouldBeUnique, ShouldQueue
             return;
         }
 
-        if (! $this->isFinal($generation->status)) {
+        if (! $generation->status->isFinal()) {
             $this->release(self::INTERVAL_SECONDS);
         }
-    }
-
-    private function isFinal(GenerationStatus $status): bool
-    {
-        return $status === GenerationStatus::Succeeded || $status === GenerationStatus::Failed;
     }
 }

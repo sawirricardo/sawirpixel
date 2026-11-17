@@ -151,7 +151,7 @@ final class SubmitGeneration implements ShouldBeUnique, ShouldQueue
     {
         return Generation::query()
             ->whereNotNull('pixelforge_id')
-            ->whereIn('status', [GenerationStatus::Queued, GenerationStatus::Processing])
+            ->whereIn('status', GenerationStatus::atProvider())
             ->where('submitted_at', '>=', now()->subMinutes(self::IN_FLIGHT_WINDOW_MINUTES))
             ->count();
     }
