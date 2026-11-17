@@ -32,6 +32,6 @@ final class RegisterController
         Auth::login($user);
         $request->session()->regenerate();
 
-        return to_route('organizations.create');
+        return redirect()->intended(route('home'));
     }
 }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, Link, useForm, useHttp, usePage } from '@inertiajs/vue3';
+import { Head, useForm, useHttp, usePage } from '@inertiajs/vue3';
 import {
     computed,
     nextTick,
@@ -8,6 +8,8 @@ import {
     ref,
     watch,
 } from 'vue';
+import AccessDialog from '@/components/AccessDialog.vue';
+import type { AccessStep } from '@/components/AccessDialog.vue';
 import PillMenu from '@/components/PillMenu.vue';
 import type { PillOption } from '@/components/PillMenu.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -63,7 +65,35 @@ const textarea = ref<HTMLTextAreaElement | null>(null);
 const showReferenceInput = ref(false);
 const referenceDraft = ref('');
 const referenceDraftError = ref<string | null>(null);
-const blockedReason = ref<'guest' | 'organization' | 'permission' | null>(null);
+const accessOpen = ref(false);
+const accessStep = ref<AccessStep>('login');
+const noPermission = ref(false);
+const readyMessage = ref<string | null>(null);
+
+/**
+ * The access dialog keeps this page's state across its form posts, so once the user is logged in
+ * and has an organization the props update here: move to the next step, or close and let them send.
+ */
+watch(
+    () =>
+        [auth.value.user, auth.value.organization, props.canGenerate] as const,
+    ([user, organization, canGenerate]) => {
+        if (!accessOpen.value) {
+            return;
+        }
+
+        if (canGenerate) {
+            accessOpen.value = false;
+            readyMessage.value = "You're all set. Press send to generate.";
+            void nextTick(() => textarea.value?.focus());
+        } else if (user && !organization) {
+            accessStep.value = 'organization';
+        } else if (user) {
+            accessOpen.value = false;
+            noPermission.value = true;
+        }
+    },
+);
 
 function autoGrow(): void {
     const element = textarea.value;
@@ -208,14 +238,17 @@ function submit(): void {
     }
 
     if (!props.canGenerate) {
-        blockedReason.value = !auth.value.user
-            ? 'guest'
-            : !auth.value.organization
-              ? 'organization'
-              : 'permission';
+        if (auth.value.user && auth.value.organization) {
+            noPermission.value = true;
+        } else {
+            accessStep.value = auth.value.user ? 'organization' : 'login';
+            accessOpen.value = true;
+        }
 
         return;
     }
+
+    readyMessage.value = null;
 
     form.post('/generations', {
         preserveScroll: true,
@@ -452,53 +485,29 @@ function onKeydown(event: KeyboardEvent): void {
                 {{ firstError }}
             </p>
 
-            <div
-                v-if="blockedReason"
-                class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-zinc-200 bg-white px-5 py-4 text-sm"
+            <p
+                v-if="readyMessage"
+                class="mt-3 px-2 text-sm text-emerald-700"
                 role="status"
             >
-                <template v-if="blockedReason === 'guest'">
-                    <span
-                        >Log in to generate this image. Your prompt will be
-                        kept.</span
-                    >
-                    <span class="flex items-center gap-3">
-                        <Link
-                            href="/register"
-                            class="font-medium text-zinc-700 hover:text-zinc-900"
-                        >
-                            Create account
-                        </Link>
-                        <Link
-                            href="/login"
-                            class="rounded-full bg-zinc-900 px-4 py-2 font-medium text-white hover:bg-zinc-700"
-                        >
-                            Log in
-                        </Link>
-                    </span>
-                </template>
-                <template v-else-if="blockedReason === 'organization'">
-                    <span
-                        >Create an organization to start generating. Your prompt
-                        will be kept.</span
-                    >
-                    <Link
-                        href="/organizations/create"
-                        class="rounded-full bg-zinc-900 px-4 py-2 font-medium text-white hover:bg-zinc-700"
-                    >
-                        Create organization
-                    </Link>
-                </template>
-                <span v-else>
-                    Your role in {{ auth.organization?.name }} doesn't allow
-                    generating images. Ask an admin for access.
-                </span>
-            </div>
+                {{ readyMessage }}
+            </p>
+
+            <p
+                v-if="noPermission"
+                class="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800"
+                role="status"
+            >
+                Your role in {{ auth.organization?.name }} doesn't allow
+                generating images. Ask an admin for access.
+            </p>
 
             <p class="mt-4 text-center text-xs text-zinc-400">
                 The price is an estimate: it's set once the image is finished,
                 and failed generations are free.
             </p>
         </div>
+
+        <AccessDialog v-model:open="accessOpen" v-model:step="accessStep" />
     </AppLayout>
 </template>

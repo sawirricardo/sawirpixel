@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use App\Models\User;
 
-test('creates the account, logs it in and asks for an organization', function (): void {
+test('creates the account, logs it in and returns to the page they came from', function (): void {
     $response = $this->post(route('register'), [
         'name' => 'Ada Lovelace',
         'email' => 'ada@example.com',
@@ -12,7 +12,7 @@ test('creates the account, logs it in and asks for an organization', function ()
         'password_confirmation' => 'password',
     ]);
 
-    $response->assertRedirect(route('organizations.create'));
+    $response->assertRedirect(route('home'));
 
     $user = User::query()->where('email', 'ada@example.com')->sole();
     expect($user->name)->toBe('Ada Lovelace');
