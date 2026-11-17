@@ -14,6 +14,7 @@ test('creates owner, admin and member roles with their default permissions when 
         ->toBe($expectedPermissions);
 })->with([
     'owner' => ['Owner', [
+        'credits.buy',
         'generations.create',
         'members.invite',
         'members.remove',
@@ -23,6 +24,7 @@ test('creates owner, admin and member roles with their default permissions when 
         'roles.manage',
     ]],
     'admin' => ['Admin', [
+        'credits.buy',
         'generations.create',
         'members.invite',
         'members.remove',

@@ -2,14 +2,17 @@
 import { Link, usePage } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
 import AccessDialog from '@/components/AccessDialog.vue';
+import BuyCreditsDialog from '@/components/BuyCreditsDialog.vue';
 import HistorySidebar from '@/components/HistorySidebar.vue';
 import OrganizationSwitcher from '@/components/OrganizationSwitcher.vue';
 import { useAccessDialog } from '@/lib/accessDialog';
+import { useCreditsDialog } from '@/lib/creditsDialog';
 import type { SharedProps } from '@/types';
 
 const page = usePage<SharedProps>();
 const auth = computed(() => page.props.auth);
 const access = useAccessDialog();
+const creditsDialog = useCreditsDialog();
 
 /**
  * The history sidebar belongs to working in an organization; the operator area is global.
@@ -115,6 +118,35 @@ const success = computed(() => {
                     </div>
                     <div class="flex items-center gap-4 text-sm">
                         <template v-if="auth.user">
+                            <button
+                                v-if="auth.credits"
+                                type="button"
+                                class="flex items-center gap-1.5 rounded-full border border-zinc-200 px-3 py-1 font-medium tabular-nums enabled:hover:bg-zinc-100 disabled:cursor-default"
+                                :disabled="!auth.credits.canBuy"
+                                :title="
+                                    [
+                                        `${auth.organization?.name} credits`,
+                                        auth.credits.reserved.amount === '0'
+                                            ? ''
+                                            : `${auth.credits.reserved.formatted} set aside for images in progress`,
+                                        auth.credits.canBuy
+                                            ? 'Buy credits'
+                                            : 'Ask an owner or admin to buy credits',
+                                    ]
+                                        .filter(Boolean)
+                                        .join(' · ')
+                                "
+                                @click="creditsDialog.show()"
+                            >
+                                {{ auth.credits.balance.formatted }}
+                                <span
+                                    v-if="auth.credits.canBuy"
+                                    class="text-zinc-400"
+                                    aria-hidden="true"
+                                    >+</span
+                                >
+                                <span class="sr-only">credits</span>
+                            </button>
                             <OrganizationSwitcher
                                 v-if="auth.organization"
                                 :current="auth.organization"
@@ -164,6 +196,7 @@ const success = computed(() => {
             </main>
         </div>
 
+        <BuyCreditsDialog v-model:open="creditsDialog.open.value" />
         <AccessDialog
             v-model:open="access.open.value"
             v-model:step="access.step.value"

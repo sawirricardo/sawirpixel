@@ -7,6 +7,7 @@ namespace App\Jobs;
 use App\Enums\GenerationStatus;
 use App\Exceptions\Pixelforge\PixelforgeException;
 use App\Models\Generation;
+use App\Services\Billing\CreditLedger;
 use App\Services\Pixelforge\Data\GenerationRequest;
 use App\Services\Pixelforge\PixelforgeClient;
 use Carbon\CarbonInterface;
@@ -16,6 +17,7 @@ use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Attributes\Backoff;
 use Illuminate\Queue\Middleware\RateLimited;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Throwable;
 
 /**
@@ -152,15 +154,25 @@ final class SubmitGeneration implements ShouldBeUnique, ShouldQueue
             ->count();
     }
 
+    /**
+     * The generation was never accepted, so it costs nothing: mark it failed and return its hold. Only
+     * the call that actually moves it out of pending releases anything.
+     */
     private function markFailed(string $code, string $message): void
     {
-        Generation::query()->whereKey($this->generation->id)->where('status', GenerationStatus::Pending)->update([
-            'status' => GenerationStatus::Failed,
-            'provider_cost' => '0',
-            'charge' => '0',
-            'error_code' => $code,
-            'error_message' => $message,
-            'completed_at' => now(),
-        ]);
+        DB::transaction(function () use ($code, $message): void {
+            $updated = Generation::query()->whereKey($this->generation->id)->where('status', GenerationStatus::Pending)->update([
+                'status' => GenerationStatus::Failed,
+                'provider_cost' => '0',
+                'charge' => '0',
+                'error_code' => $code,
+                'error_message' => $message,
+                'completed_at' => now(),
+            ]);
+
+            if ($updated === 1) {
+                resolve(CreditLedger::class)->settle(Generation::query()->findOrFail($this->generation->id), null);
+            }
+        });
     }
 }

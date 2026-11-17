@@ -19,7 +19,7 @@ const hasInProgress = computed(() =>
 
 const { start, stop } = usePoll(
     3000,
-    { only: ['generations'] },
+    { only: ['generations', 'auth'] },
     { autoStart: false },
 );
 

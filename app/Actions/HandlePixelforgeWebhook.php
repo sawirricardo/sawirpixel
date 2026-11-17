@@ -46,7 +46,11 @@ final readonly class HandlePixelforgeWebhook
                     $this->apply->handle($generation, $snapshot);
                 }
             });
-        } catch (UniqueConstraintViolationException) {
+        } catch (UniqueConstraintViolationException $uniqueConstraintViolationException) {
+            // Only a repeat of an event we've already recorded is a harmless duplicate; any other
+            // collision is a real error and must surface so Pixelforge retries.
+            throw_unless(PixelforgeWebhookEvent::query()->where('event_id', $event->string('id')->value())->exists(), $uniqueConstraintViolationException);
+
             return false;
         }
 

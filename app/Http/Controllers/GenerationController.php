@@ -9,12 +9,17 @@ use App\Http\Requests\StoreGenerationRequest;
 use App\Jobs\SubmitGeneration;
 use App\Models\Generation;
 use App\Models\User;
+use App\Services\Billing\CreditLedger;
 use App\Services\Pricing\GenerationCostEstimator;
 use App\Services\Pricing\Money;
+use Brick\Math\BigDecimal;
+use Brick\Math\RoundingMode;
 use Illuminate\Container\Attributes\CurrentUser;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -58,7 +63,7 @@ final class GenerationController
         ]);
     }
 
-    public function store(StoreGenerationRequest $request, #[CurrentUser] User $user, GenerationCostEstimator $estimator): RedirectResponse
+    public function store(StoreGenerationRequest $request, #[CurrentUser] User $user, GenerationCostEstimator $estimator, CreditLedger $ledger): RedirectResponse
     {
         $organization = $user->currentOrganization;
 
@@ -75,22 +80,42 @@ final class GenerationController
             count($request->referenceImages()),
         );
 
-        $generation = Generation::query()->create([
-            'organization_id' => $organization->id,
-            'user_id' => $user->id,
-            'status' => GenerationStatus::Pending,
-            'idempotency_key' => (string) Str::uuid(),
-            'prompt' => $request->prompt(),
-            'size' => $request->size(),
-            'quality' => $request->quality(),
-            'reference_images' => $request->referenceImages(),
-            'estimated_charge_min' => (string) $estimate->chargeMin,
-            'estimated_charge_max' => (string) $estimate->chargeMax,
-        ]);
+        // Reserve the most it can cost. The estimate is worked out first: it may fetch pricing over HTTP,
+        // which shouldn't happen while the user's row is locked.
+        $generation = DB::transaction(function () use ($request, $user, $organization, $estimate, $ledger): Generation {
+            $lockedOrganization = $ledger->lockOrganization($organization->id);
+            $balance = BigDecimal::of($lockedOrganization->credit_balance);
+
+            if ($balance->isLessThan($estimate->chargeMax)) {
+                throw ValidationException::withMessages(['credits' => sprintf(
+                    'This could cost up to %s, but %s has %s in credits. Buy credits to generate it.',
+                    Money::format($estimate->chargeMax, RoundingMode::Up),
+                    $lockedOrganization->name,
+                    Money::format($balance, RoundingMode::Down),
+                )]);
+            }
+
+            $generation = Generation::query()->create([
+                'organization_id' => $organization->id,
+                'user_id' => $user->id,
+                'status' => GenerationStatus::Pending,
+                'idempotency_key' => (string) Str::uuid(),
+                'prompt' => $request->prompt(),
+                'size' => $request->size(),
+                'quality' => $request->quality(),
+                'reference_images' => $request->referenceImages(),
+                'estimated_charge_min' => (string) $estimate->chargeMin,
+                'estimated_charge_max' => (string) $estimate->chargeMax,
+            ]);
+
+            $ledger->hold($lockedOrganization, $generation, $estimate->chargeMax);
+
+            return $generation;
+        });
 
         dispatch(new SubmitGeneration($generation));
 
-        Inertia::flash('success', 'Your image is on its way. You will only be charged if it succeeds.');
+        Inertia::flash('success', 'Your image is on its way. We set aside its maximum cost and charge only what it actually costs, or nothing if it fails.');
 
         return to_route('generations.show', $generation);
     }

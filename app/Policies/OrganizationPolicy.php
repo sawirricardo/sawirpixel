@@ -33,6 +33,11 @@ final class OrganizationPolicy
         return $this->allows($user, $organization, Permission::ManageRoles);
     }
 
+    public function buyCredits(User $user, Organization $organization): bool
+    {
+        return $this->allows($user, $organization, Permission::BuyCredits);
+    }
+
     private function allows(User $user, Organization $organization, Permission $permission): bool
     {
         return $user->membershipIn($organization)?->hasPermission($permission) ?? false;

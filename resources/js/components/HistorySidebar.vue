@@ -16,7 +16,7 @@ const inProgress: GenerationStatus[] = ['pending', 'queued', 'processing'];
  */
 const { start, stop } = usePoll(
     3000,
-    { only: ['recentGenerations'] },
+    { only: ['recentGenerations', 'auth'] },
     { autoStart: false },
 );
 

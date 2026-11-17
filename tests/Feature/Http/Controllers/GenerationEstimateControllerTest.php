@@ -25,8 +25,27 @@ test('estimates the exact charge range from pixelforge pricing plus the markup',
             'output' => ['min' => 1100, 'max' => 1100],
             'reasoning' => ['min' => 200, 'max' => 2000],
         ],
+        'affordable' => null,
     ]);
 });
+
+test('says whether the current organization can afford the maximum', function (string $balance, bool $affordable): void {
+    fakePixelforgePricing();
+    $user = organizationOwner();
+    fundOrganization($user->currentOrganization, $balance);
+    $user->refresh();
+
+    $response = $this->actingAs($user)->postJson(route('generations.estimate'), [
+        'prompt' => str_repeat('a', 40),
+        'size' => '1024x1024',
+        'quality' => 'medium',
+    ]);
+
+    $response->assertOk()->assertJsonPath('affordable', $affordable);
+})->with([
+    'covers the maximum exactly' => ['0.0863250000', true],
+    'just short' => ['0.0863249999', false],
+]);
 
 test('fetches pricing once and reuses it for later estimates', function (): void {
     fakePixelforgePricing();

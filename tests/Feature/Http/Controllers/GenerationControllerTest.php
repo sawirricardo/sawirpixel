@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Enums\CreditTransactionType;
 use App\Enums\GenerationStatus;
 use App\Jobs\SubmitGeneration;
+use App\Models\CreditTransaction;
 use App\Models\Generation;
 use App\Models\OrgUser;
 use App\Models\User;
@@ -15,6 +17,7 @@ describe('store', function (): void {
         fakePixelforgePricing();
         Queue::fake([SubmitGeneration::class]);
         $user = organizationOwner();
+        fundOrganization($user->currentOrganization, '1');
 
         $response = $this->actingAs($user)->post(route('generations.store'), [
             'prompt' => str_repeat('a', 40),
@@ -34,6 +37,58 @@ describe('store', function (): void {
         expect($generation->estimated_charge_min)->toBe('0.0677375000');
         expect($generation->estimated_charge_max)->toBe('0.0958875000');
         Queue::assertPushed(SubmitGeneration::class, fn (SubmitGeneration $job): bool => $job->generation->is($generation));
+        expect($user->currentOrganization->refresh()->credit_balance)->toBe('0.9041125000');
+        $hold = CreditTransaction::query()->where('generation_id', $generation->id)->sole();
+        expect($hold->type)->toBe(CreditTransactionType::Hold);
+        expect($hold->amount)->toBe('-0.0958875000');
+        expect($hold->user_id)->toBe($user->id);
+        expectBalanceMatchesLedger($user->currentOrganization);
+    });
+
+    test('blocks a generation the organization cannot afford at its maximum cost', function (string $balance, bool $allowed): void {
+        fakePixelforgePricing();
+        Queue::fake([SubmitGeneration::class]);
+        $user = organizationOwner();
+        fundOrganization($user->currentOrganization, $balance);
+
+        $response = $this->actingAs($user)->post(route('generations.store'), [
+            'prompt' => str_repeat('a', 40),
+            'size' => '1024x1024',
+            'quality' => 'medium',
+            'reference_images' => ['https://example.com/ref.png'],
+        ]);
+
+        if ($allowed) {
+            $response->assertSessionHasNoErrors();
+            expect(Generation::query()->count())->toBe(1);
+            expect($user->currentOrganization->refresh()->credit_balance)->toBe('0.0000000000');
+
+            return;
+        }
+
+        $response->assertSessionHasErrors(['credits' => 'This could cost up to $0.10, but Acme Studio has $0.09 in credits. Buy credits to generate it.']);
+        expect(Generation::query()->count())->toBe(0);
+        Queue::assertNothingPushed();
+        expect($user->currentOrganization->refresh()->credit_balance)->toBe($balance);
+    })->with([
+        'exactly the maximum' => ['0.0958875000', true],
+        'a ten-billionth short' => ['0.0958874999', false],
+    ]);
+
+    test("counts an earlier generation's hold against the balance", function (): void {
+        fakePixelforgePricing();
+        Queue::fake([SubmitGeneration::class]);
+        $user = organizationOwner();
+        fundOrganization($user->currentOrganization, '0.15');
+        $input = ['prompt' => str_repeat('a', 40), 'size' => '1024x1024', 'quality' => 'medium', 'reference_images' => ['https://example.com/ref.png']];
+
+        $this->actingAs($user)->post(route('generations.store'), $input)->assertSessionHasNoErrors();
+        $second = $this->actingAs($user)->post(route('generations.store'), $input);
+
+        $second->assertSessionHasErrors('credits');
+
+        expect(Generation::query()->count())->toBe(1);
+        expectBalanceMatchesLedger($user->currentOrganization);
     });
 
     test('sends a guest to log in', function (): void {

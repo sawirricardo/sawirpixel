@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 use App\Actions\CreateOrganization;
 use App\Enums\DefaultRole;
+use App\Models\CreditTransaction;
 use App\Models\Organization;
 use App\Models\User;
+use App\Services\Billing\CreditLedger;
+use Brick\Math\BigDecimal;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
@@ -124,4 +127,25 @@ function addMember(Organization $organization, DefaultRole $role, ?User $user = 
     $user->currentOrganization()->associate($organization)->save();
 
     return $user->refresh();
+}
+
+/**
+ * Add credits to an organization through the ledger, as a purchase.
+ */
+function fundOrganization(Organization $organization, string $amount): void
+{
+    resolve(CreditLedger::class)->purchase($organization, User::factory()->create(), BigDecimal::of($amount), (string) Str::uuid());
+}
+
+/**
+ * The organization's cached balance must always equal the sum of its ledger.
+ */
+function expectBalanceMatchesLedger(Organization $organization): void
+{
+    $sum = CreditTransaction::query()
+        ->where('organization_id', $organization->id)
+        ->pluck('amount')
+        ->reduce(fn (BigDecimal $total, mixed $amount): BigDecimal => $total->plus(BigDecimal::of(is_string($amount) ? $amount : '0')), BigDecimal::zero());
+
+    expect(BigDecimal::of($organization->refresh()->credit_balance)->isEqualTo($sum))->toBeTrue();
 }

@@ -5,8 +5,12 @@ declare(strict_types=1);
 use App\Enums\GenerationStatus;
 use App\Jobs\PollGeneration;
 use App\Jobs\SubmitGeneration;
+use App\Models\CreditTransaction;
 use App\Models\Generation;
+use App\Models\Organization;
+use App\Services\Billing\CreditLedger;
 use App\Services\Pixelforge\PixelforgeClient;
+use Brick\Math\BigDecimal;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Client\Request;
 use Illuminate\Pipeline\Pipeline;
@@ -166,4 +170,44 @@ test('is unique per generation and keeps retrying for an hour', function (): voi
 
     expect($job->uniqueId())->toBe((string) $generation->id);
     expect($job->retryUntil()->toDateTimeString())->toBe(now()->addHour()->toDateTimeString());
+});
+
+test('returns the hold whenever a submission ends without Pixelforge accepting it', function (string $how): void {
+    $organization = Organization::factory()->create();
+    fundOrganization($organization, '1');
+    $generation = Generation::factory()->for($organization)->create(['estimated_charge_max' => '0.5']);
+    $ledger = resolve(CreditLedger::class);
+    $ledger->hold($ledger->lockOrganization($organization->id), $generation, BigDecimal::of('0.5'));
+
+    $job = new SubmitGeneration($generation);
+
+    match ($how) {
+        'rejected prompt' => (function () use ($job): void {
+            Http::fake(['pixelforge.promptedit.dev/v1/generations' => Http::response(['error' => ['code' => 'content_policy_violation', 'message' => 'Blocked.']], 400)]);
+            $job->handle(resolve(PixelforgeClient::class));
+        })(),
+        'daily limit' => (function () use ($job): void {
+            Http::fake(['pixelforge.promptedit.dev/v1/generations' => Http::response(['error' => ['code' => 'daily_limit_exceeded', 'message' => 'Limit.']], 429)]);
+            $job->withFakeQueueInteractions()->handle(resolve(PixelforgeClient::class));
+        })(),
+        'retries exhausted' => $job->failed(new RuntimeException('Timed out')),
+    };
+
+    expect($generation->refresh()->status)->toBe(GenerationStatus::Failed);
+    expect($organization->refresh()->credit_balance)->toBe('1.0000000000');
+    expectBalanceMatchesLedger($organization);
+})->with(['rejected prompt', 'daily limit', 'retries exhausted']);
+
+test('does not return a hold twice if a generation is marked failed again', function (): void {
+    $organization = Organization::factory()->create();
+    fundOrganization($organization, '1');
+    $generation = Generation::factory()->for($organization)->create(['estimated_charge_max' => '0.5']);
+    $ledger = resolve(CreditLedger::class);
+    $ledger->hold($ledger->lockOrganization($organization->id), $generation, BigDecimal::of('0.5'));
+
+    (new SubmitGeneration($generation))->failed(new RuntimeException('Timed out'));
+    (new SubmitGeneration($generation))->failed(new RuntimeException('Timed out'));
+
+    expect($organization->refresh()->credit_balance)->toBe('1.0000000000');
+    expect(CreditTransaction::query()->where('generation_id', $generation->id)->count())->toBe(2);
 });

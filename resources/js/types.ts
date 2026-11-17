@@ -21,6 +21,7 @@ export type SharedProps = {
         organization: { id: number; name: string } | null;
         organizations: { id: number; name: string }[];
         canViewMembers: boolean;
+        credits: { balance: Money; reserved: Money; canBuy: boolean } | null;
     };
 };
 
@@ -35,7 +36,8 @@ export type CostEstimate = {
     tokens: Record<
         'input_text' | 'input_image' | 'output' | 'reasoning',
         Range<number>
-    >;
+    > /** Whether the user's balance covers the maximum; null for guests. */;
+    affordable: boolean | null;
 };
 
 export type GenerationStatus =

@@ -13,6 +13,7 @@ enum Permission: string
     case RemoveMembers = 'members.remove';
     case ManageRoles = 'roles.manage';
     case CreateGenerations = 'generations.create';
+    case BuyCredits = 'credits.buy';
 
     public function label(): string
     {
@@ -24,6 +25,7 @@ enum Permission: string
             self::RemoveMembers => 'Remove members',
             self::ManageRoles => 'Change member roles',
             self::CreateGenerations => 'Generate images',
+            self::BuyCredits => 'Buy credits',
         };
     }
 }

@@ -15,11 +15,28 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /**
  * @property-read int $id
  * @property string $name
+ * @property string $credit_balance Exact USD, kept in step with the credit ledger by CreditLedger.
  */
 final class Organization extends Model
 {
     /** @use HasFactory<OrganizationFactory> */
     use HasFactory;
+
+    /**
+     * Mirrors the column default so a new organization starts with no credits.
+     *
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'credit_balance' => '0',
+    ];
+
+    /**
+     * @var array<string, string>
+     */
+    protected $casts = [
+        'credit_balance' => 'decimal:10',
+    ];
 
     /**
      * Give every new organization its default roles.

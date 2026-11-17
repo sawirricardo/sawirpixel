@@ -14,7 +14,7 @@ const running = computed(() => inProgress.includes(props.generation.status));
 
 const { start, stop } = usePoll(
     3000,
-    { only: ['generation', 'recentGenerations'] },
+    { only: ['generation', 'recentGenerations', 'auth'] },
     { autoStart: false },
 );
 

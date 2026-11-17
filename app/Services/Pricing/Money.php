@@ -13,19 +13,19 @@ use Brick\Math\RoundingMode;
 final class Money
 {
     /**
-     * Rounds half-up to the cent. A non-zero amount below half a cent is shown to four decimal places
-     * instead, so a real charge is never displayed as $0.00.
+     * Rounds to the cent (half-up unless told otherwise). A non-zero amount that would show as $0.00 is
+     * shown to four decimal places instead, so a real charge is never displayed as free.
      */
-    public static function format(BigDecimal|string $amount): string
+    public static function format(BigDecimal|string $amount, RoundingMode $roundingMode = RoundingMode::HalfUp): string
     {
         $amount = BigDecimal::of($amount);
-        $cents = $amount->toScale(2, RoundingMode::HalfUp);
+        $cents = $amount->toScale(2, $roundingMode);
 
         if ($cents->isZero() && ! $amount->isZero()) {
-            return '$'.$amount->toScale(4, RoundingMode::HalfUp);
+            return ($amount->isNegative() ? '-$' : '$').$amount->abs()->toScale(4, $roundingMode);
         }
 
-        return '$'.$cents;
+        return ($cents->isNegative() ? '-$' : '$').$cents->abs();
     }
 
     /**

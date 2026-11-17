@@ -7,6 +7,7 @@ namespace App\Actions;
 use App\Enums\GenerationStatus;
 use App\Enums\Pixelforge\GenerationStatus as PixelforgeStatus;
 use App\Models\Generation;
+use App\Services\Billing\CreditLedger;
 use App\Services\Pixelforge\Data\Generation as PixelforgeGeneration;
 use App\Services\Pixelforge\Data\GenerationRates;
 use App\Services\Pixelforge\Data\GenerationUsage;
@@ -19,11 +20,15 @@ use UnexpectedValueException;
  * safe to apply the same or an older snapshot any number of times, in any order.
  *
  * Status only moves forward (pending → queued → processing → succeeded|failed) and never leaves a final
- * state, so the cost of a finished generation is recorded exactly once.
+ * state, so the cost of a finished generation is recorded exactly once, and the organization's credits are
+ * settled (hold returned, actual cost charged) in the same transaction.
  */
 final readonly class ApplyPixelforgeGeneration
 {
-    public function __construct(private GenerationCostEstimator $estimator) {}
+    public function __construct(
+        private GenerationCostEstimator $estimator,
+        private CreditLedger $ledger,
+    ) {}
 
     public function handle(Generation $generation, PixelforgeGeneration $snapshot): Generation
     {
@@ -72,8 +77,12 @@ final readonly class ApplyPixelforgeGeneration
 
         $providerCost = $this->estimator->providerCostFor($snapshot->usage, $snapshot->rates);
 
+        $charge = $this->estimator->charge($providerCost);
+
         $generation->provider_cost = (string) $providerCost;
-        $generation->charge = (string) $this->estimator->charge($providerCost);
+        $generation->charge = (string) $charge;
+
+        $this->ledger->settle($generation, $charge);
         $generation->usage = [
             'input_text_tokens' => $snapshot->usage->inputTextTokens,
             'input_image_tokens' => $snapshot->usage->inputImageTokens,
@@ -94,6 +103,8 @@ final readonly class ApplyPixelforgeGeneration
     {
         $generation->provider_cost = '0';
         $generation->charge = '0';
+
+        $this->ledger->settle($generation, null);
         $generation->error_code = $snapshot->error?->code;
         $generation->error_message = $snapshot->error?->message;
         $generation->completed_at = $snapshot->completedAt ?? now();

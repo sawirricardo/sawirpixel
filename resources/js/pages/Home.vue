@@ -12,6 +12,7 @@ import PillMenu from '@/components/PillMenu.vue';
 import type { PillOption } from '@/components/PillMenu.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { useAccessDialog } from '@/lib/accessDialog';
+import { useCreditsDialog } from '@/lib/creditsDialog';
 import { formatMoneyRange } from '@/lib/money';
 import type { CostEstimate, SharedProps } from '@/types';
 
@@ -65,6 +66,17 @@ const showReferenceInput = ref(false);
 const referenceDraft = ref('');
 const referenceDraftError = ref<string | null>(null);
 const access = useAccessDialog();
+const creditsDialog = useCreditsDialog();
+
+/**
+ * True once the estimate says the organization's balance can't cover the most this could cost.
+ */
+const cannotAfford = computed(
+    () =>
+        props.canGenerate &&
+        estimate.response?.affordable === false &&
+        !estimate.hasErrors,
+);
 const noPermission = ref(false);
 const readyMessage = ref<string | null>(null);
 
@@ -149,7 +161,15 @@ const estimate = useHttp<
 let debounce: ReturnType<typeof setTimeout> | undefined;
 
 watch(
-    () => [form.prompt, form.size, form.quality, [...form.reference_images]],
+    // The balance is watched too: affordability depends on it, e.g. right after buying credits.
+    () => [
+        form.prompt,
+        form.size,
+        form.quality,
+        [...form.reference_images],
+        auth.value.credits?.balance.amount,
+        auth.value.organization?.id,
+    ],
     () => {
         clearTimeout(debounce);
         debounce = setTimeout(() => {
@@ -256,6 +276,7 @@ const errors = computed(
 );
 const firstError = computed(
     () =>
+        errors.value.credits ??
         errors.value.prompt ??
         errors.value.size ??
         errors.value.quality ??
@@ -279,6 +300,14 @@ function submit(): void {
             access.show(auth.value.user ? 'organization' : 'login', {
                 purpose: 'generate',
             });
+        }
+
+        return;
+    }
+
+    if (cannotAfford.value) {
+        if (page.props.auth.credits?.canBuy) {
+            creditsDialog.show();
         }
 
         return;
@@ -554,6 +583,30 @@ function onKeydown(event: KeyboardEvent): void {
             >
                 {{ firstError }}
             </p>
+
+            <div
+                v-if="cannotAfford && estimate.response"
+                class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-900"
+                role="status"
+            >
+                <span>
+                    This could cost up to
+                    {{ estimate.response.charge.max.formatted }}, but
+                    {{ auth.organization?.name }} has
+                    {{ page.props.auth.credits?.balance.formatted }} in credits.
+                    <template v-if="!page.props.auth.credits?.canBuy">
+                        Ask an owner or admin to buy credits.
+                    </template>
+                </span>
+                <button
+                    v-if="page.props.auth.credits?.canBuy"
+                    type="button"
+                    class="rounded-full bg-zinc-900 px-4 py-1.5 font-medium text-white hover:bg-zinc-700"
+                    @click="creditsDialog.show()"
+                >
+                    Buy credits
+                </button>
+            </div>
 
             <p
                 v-if="readyMessage"

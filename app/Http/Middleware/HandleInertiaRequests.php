@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace App\Http\Middleware;
 
 use App\Models\Generation;
+use App\Models\Organization;
 use App\Models\OrgUser;
 use App\Models\User;
+use App\Services\Billing\CreditLedger;
+use App\Services\Pricing\Money;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
@@ -42,6 +45,11 @@ final class HandleInertiaRequests extends Middleware
                     'name' => $user->name,
                     'email' => $user->email,
                     'is_super_admin' => $user->isSuperAdmin(),
+                ] : null,
+                'credits' => fn (): ?array => $user instanceof User && $user->currentOrganization instanceof Organization ? [
+                    'balance' => Money::toArray($user->currentOrganization->credit_balance),
+                    'reserved' => Money::toArray(resolve(CreditLedger::class)->reserved($user->currentOrganization)),
+                    'canBuy' => Gate::forUser($user)->allows('buyCredits', $user->currentOrganization),
                 ] : null,
                 'organization' => fn (): ?array => $user instanceof User && $user->currentOrganization !== null ? [
                     'id' => $user->currentOrganization->id,

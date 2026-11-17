@@ -2,9 +2,15 @@
 
 declare(strict_types=1);
 
+use App\Enums\CreditTransactionType;
 use App\Enums\GenerationStatus;
+use App\Models\CreditTransaction;
 use App\Models\Generation;
+use App\Models\Organization;
 use App\Models\PixelforgeWebhookEvent;
+use App\Services\Billing\CreditLedger;
+use Brick\Math\BigDecimal;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Testing\TestResponse;
 
 beforeEach(function (): void {
@@ -154,4 +160,63 @@ test('rejects a signed body that is not json', function (): void {
     $response->assertBadRequest();
 
     expect(PixelforgeWebhookEvent::query()->count())->toBe(0);
+});
+
+describe('credits', function (): void {
+    /**
+     * A generation submitted the normal way: the organization funded, and its maximum held.
+     */
+    function heldForWebhook(string $funds = '1', string $hold = '0.5'): Generation
+    {
+        $organization = Organization::factory()->create();
+        fundOrganization($organization, $funds);
+        $generation = Generation::factory()->queued()->for($organization)->create(['pixelforge_id' => 'gen_1', 'estimated_charge_max' => $hold]);
+        $ledger = resolve(CreditLedger::class);
+        $ledger->hold($ledger->lockOrganization($organization->id), $generation, BigDecimal::of($hold));
+
+        return $generation;
+    }
+
+    test('charges the organization exactly what the generation cost and returns the rest of the hold', function (): void {
+        $generation = heldForWebhook();
+
+        deliverPixelforgeEvent('evt_1', 'generation.succeeded', pixelforgeGenerationPayload('succeeded'));
+
+        expect($generation->organization->refresh()->credit_balance)->toBe('0.6181125000');
+        expectBalanceMatchesLedger($generation->organization);
+    });
+
+    test('charges once however the events arrive', function (): void {
+        $generation = heldForWebhook();
+
+        deliverPixelforgeEvent('evt_2', 'generation.succeeded', pixelforgeGenerationPayload('succeeded'));
+        deliverPixelforgeEvent('evt_2', 'generation.succeeded', pixelforgeGenerationPayload('succeeded'));
+        deliverPixelforgeEvent('evt_1', 'generation.processing', pixelforgeGenerationPayload('processing'));
+        deliverPixelforgeEvent('evt_3', 'generation.succeeded', pixelforgeGenerationPayload('succeeded'));
+
+        expect(CreditTransaction::query()->where('generation_id', $generation->id)->where('type', CreditTransactionType::Charge)->count())->toBe(1);
+        expect($generation->organization->refresh()->credit_balance)->toBe('0.6181125000');
+        expectBalanceMatchesLedger($generation->organization);
+    });
+
+    test('returns the whole hold when the generation fails after being accepted', function (): void {
+        $generation = heldForWebhook();
+
+        deliverPixelforgeEvent('evt_1', 'generation.failed', pixelforgeGenerationPayload('failed'));
+
+        expect($generation->organization->refresh()->credit_balance)->toBe('1.0000000000');
+        expectBalanceMatchesLedger($generation->organization);
+    });
+});
+
+test('surfaces a database conflict that is not a repeated event instead of acknowledging it', function (): void {
+    $generation = Generation::factory()->queued()->create(['pixelforge_id' => 'gen_1']);
+    PixelforgeWebhookEvent::creating(fn (): never => throw new UniqueConstraintViolationException('sqlite', 'insert', [], new PDOException('UNIQUE constraint failed')));
+
+    $response = deliverPixelforgeEvent('evt_new', 'generation.succeeded', pixelforgeGenerationPayload('succeeded'));
+
+    $response->assertServerError();
+
+    expect($generation->refresh()->status)->toBe(GenerationStatus::Queued);
+    PixelforgeWebhookEvent::flushEventListeners();
 });

@@ -39,7 +39,7 @@ describe('index', function (): void {
             ->where('invitations.0.roles', ['Member'])
             ->has('roles', 3)
             ->has('grantable.roles', 3)
-            ->has('grantable.permissions', 7)
+            ->has('grantable.permissions', 8)
             ->where('can', ['invite' => true, 'remove' => true, 'manageRoles' => true]));
     });
 
@@ -65,7 +65,7 @@ describe('index', function (): void {
 
         $response->assertInertia(fn (Assert $page): Assert => $page
             ->where('grantable.roles', fn ($roles): bool => collect($roles)->pluck('name')->all() === ['Admin', 'Member'])
-            ->has('grantable.permissions', 6));
+            ->has('grantable.permissions', 7));
     });
 
     test('asks a user without an organization to create one first', function (): void {
