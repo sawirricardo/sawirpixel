@@ -13,30 +13,46 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Changes a member's role or removes them, keeping two rules: only Owners can grant or take away the
+ * Changes a member's roles or removes them, keeping two rules: only Owners can grant or take away the
  * Owner role, and an organization always keeps at least one Owner.
  */
 final readonly class ManageMembership
 {
+    public function __construct(private GrantableAccess $grantableAccess) {}
+
     /**
+     * Replace a member's roles. Roles they don't already have must be ones the actor could grant.
+     *
+     * @param  list<Role>  $roles
+     *
      * @throws ValidationException
      */
-    public function changeRole(User $actor, OrgUser $member, Role $role): void
+    public function changeRoles(User $actor, OrgUser $member, array $roles): void
     {
-        DB::transaction(function () use ($actor, $member, $role): void {
+        DB::transaction(function () use ($actor, $member, $roles): void {
             $organization = $member->organization()->lockForUpdate()->sole();
+            $current = $member->roles()->pluck('roles.id')->all();
+            $names = array_map(fn (Role $role): string => $role->name, $roles);
             $isOwner = $member->hasRole(DefaultRole::Owner->value);
-            $becomesOwner = $role->name === DefaultRole::Owner->value;
+            $becomesOwner = in_array(DefaultRole::Owner->value, $names, true);
 
             if (($isOwner || $becomesOwner) && ! $this->actorIsOwner($actor, $member)) {
-                throw ValidationException::withMessages(['role_id' => 'Only owners can grant or remove the Owner role.']);
+                throw ValidationException::withMessages(['role_ids' => 'Only owners can grant or remove the Owner role.']);
             }
 
             if ($isOwner && ! $becomesOwner && $organization->ownerCount() <= 1) {
-                throw ValidationException::withMessages(['role_id' => 'An organization needs at least one owner.']);
+                throw ValidationException::withMessages(['role_ids' => 'An organization needs at least one owner.']);
             }
 
-            $member->syncRoles($role);
+            $grantable = array_map(fn (Role $role): int => $role->id, $this->grantableAccess->roles($actor, $organization));
+
+            foreach ($roles as $role) {
+                if (! in_array($role->id, $current, true) && ! in_array($role->id, $grantable, true)) {
+                    throw ValidationException::withMessages(['role_ids' => sprintf("You can't grant the %s role.", $role->name)]);
+                }
+            }
+
+            $member->syncRoles(...$roles);
         });
     }
 

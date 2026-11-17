@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, router, useForm, usePage } from '@inertiajs/vue3';
-import { computed, reactive, ref, watch } from 'vue';
+import { computed, ref } from 'vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 
 type RoleOption = { id: number; name: string };
@@ -11,7 +11,7 @@ const props = defineProps<{
         id: number;
         name: string;
         email: string;
-        role: RoleOption | null;
+        role_ids: number[];
         roles: string[];
         permissions: string[];
         is_you: boolean;
@@ -56,34 +56,37 @@ function sendInvite(): void {
     });
 }
 
+const savingMemberId = ref<number | null>(null);
+
+function canToggle(member: { role_ids: number[] }, roleId: number): boolean {
+    const has = member.role_ids.includes(roleId);
+
+    // A role can always be dropped (the server enforces the owner rules), but never the last one;
+    // only grantable roles can be added.
+    return has
+        ? member.role_ids.length > 1
+        : props.grantable.roles.some((role) => role.id === roleId);
+}
+
 /**
- * The dropdowns follow the server: after a rejected change (e.g. demoting the last owner) they snap
- * back to the role the member actually has.
+ * The chips are drawn from the server's data, so a rejected change (say, removing the last owner)
+ * simply leaves them as they were.
  */
-const selectedRoles = reactive<Record<number, number | undefined>>({});
-
-watch(
-    () => props.members,
-    (members) => {
-        for (const member of members) {
-            selectedRoles[member.id] = member.role?.id;
-        }
-    },
-    { immediate: true, deep: true },
-);
-
-function changeRole(
-    member: { id: number; role: RoleOption | null },
+function toggleRole(
+    member: { id: number; role_ids: number[] },
     roleId: number,
 ): void {
+    const roleIds = member.role_ids.includes(roleId)
+        ? member.role_ids.filter((id) => id !== roleId)
+        : [...member.role_ids, roleId];
+
+    savingMemberId.value = member.id;
     router.patch(
         `/organization/members/${member.id}`,
-        { role_id: roleId },
+        { role_ids: roleIds },
         {
             preserveScroll: true,
-            onError: () => {
-                selectedRoles[member.id] = member.role?.id;
-            },
+            onFinish: () => (savingMemberId.value = null),
         },
     );
 }
@@ -127,11 +130,11 @@ function expiresIn(date: string): string {
         <h1 class="text-2xl font-semibold">{{ organization.name }} members</h1>
 
         <p
-            v-if="pageErrors.role_id || pageErrors.member"
+            v-if="pageErrors.role_ids || pageErrors.member"
             class="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
             role="alert"
         >
-            {{ pageErrors.role_id ?? pageErrors.member }}
+            {{ pageErrors.role_ids ?? pageErrors.member }}
         </p>
 
         <form
@@ -255,47 +258,41 @@ function expiresIn(date: string): string {
                     </p>
                     <p class="text-xs text-zinc-500">{{ member.email }}</p>
                     <p
-                        v-if="
-                            member.roles.length > 1 || member.permissions.length
-                        "
+                        v-if="member.permissions.length"
                         class="mt-0.5 text-xs text-zinc-500"
                     >
-                        <template v-if="member.roles.length > 1">
-                            Roles: {{ member.roles.join(', ') }}
-                        </template>
-                        <template
-                            v-if="
-                                member.roles.length > 1 &&
-                                member.permissions.length
-                            "
-                        >
-                            ·
-                        </template>
-                        <template v-if="member.permissions.length">
-                            Also: {{ member.permissions.join(', ') }}
-                        </template>
+                        Also: {{ member.permissions.join(', ') }}
                     </p>
                 </div>
                 <div class="flex items-center gap-3 text-sm">
-                    <select
-                        v-if="can.manageRoles && member.role"
-                        v-model.number="selectedRoles[member.id]"
-                        :aria-label="`Role for ${member.name}`"
-                        class="rounded-lg border border-zinc-300 px-2 py-1"
-                        @change="
-                            changeRole(member, Number(selectedRoles[member.id]))
-                        "
+                    <div
+                        v-if="can.manageRoles"
+                        class="flex flex-wrap gap-1.5"
+                        role="group"
+                        :aria-label="`Roles for ${member.name}`"
                     >
-                        <option
+                        <button
                             v-for="role in roles"
                             :key="role.id"
-                            :value="role.id"
+                            type="button"
+                            :aria-pressed="member.role_ids.includes(role.id)"
+                            :disabled="
+                                savingMemberId === member.id ||
+                                !canToggle(member, role.id)
+                            "
+                            class="rounded-full border px-2.5 py-0.5 text-xs disabled:cursor-not-allowed"
+                            :class="
+                                member.role_ids.includes(role.id)
+                                    ? 'border-zinc-900 bg-zinc-900 text-white disabled:opacity-70'
+                                    : 'border-zinc-300 text-zinc-600 hover:border-zinc-500 disabled:opacity-40'
+                            "
+                            @click="toggleRole(member, role.id)"
                         >
                             {{ role.name }}
-                        </option>
-                    </select>
+                        </button>
+                    </div>
                     <span v-else class="text-zinc-600">{{
-                        member.role?.name ?? 'No role'
+                        member.roles.join(', ') || 'No role'
                     }}</span>
                     <button
                         v-if="can.remove && !member.is_you"

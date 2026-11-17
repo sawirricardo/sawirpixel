@@ -3,9 +3,11 @@
 declare(strict_types=1);
 
 use App\Enums\DefaultRole;
+use App\Enums\Permission;
 use App\Models\Organization;
 use App\Models\OrgInvitation;
 use App\Models\OrgUser;
+use App\Models\Role;
 use App\Models\User;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -28,10 +30,10 @@ describe('index', function (): void {
             ->component('organizations/Members')
             ->has('members', 2)
             ->where('members.0.email', $owner->email)
-            ->where('members.0.role.name', 'Owner')
+            ->where('members.0.roles', ['Owner'])
             ->where('members.0.is_you', true)
             ->where('members.1.email', $member->email)
-            ->where('members.1.role.name', 'Member')
+            ->where('members.1.roles', ['Member'])
             ->has('invitations', 1)
             ->where('invitations.0.email', 'pending@example.com')
             ->where('invitations.0.roles', ['Member'])
@@ -85,9 +87,50 @@ describe('update', function (): void {
         $member = addMember($owner->currentOrganization, DefaultRole::Member);
         $admin = $owner->currentOrganization->roles()->where('name', 'Admin')->sole();
 
-        $this->actingAs($owner)->patch(route('members.update', membershipOf($member)), ['role_id' => $admin->id])->assertSessionHasNoErrors();
+        $this->actingAs($owner)->patch(route('members.update', membershipOf($member)), ['role_ids' => [$admin->id]])->assertSessionHasNoErrors();
 
         expect(membershipOf($member)->roles()->pluck('name')->all())->toBe(['Admin']);
+    });
+
+    test('gives a member several roles without dropping the ones they keep', function (): void {
+        $owner = organizationOwner();
+        $member = addMember($owner->currentOrganization, DefaultRole::Member);
+        $roles = $owner->currentOrganization->roles()->whereIn('name', ['Admin', 'Member'])->pluck('id')->all();
+
+        $this->actingAs($owner)->patch(route('members.update', membershipOf($member)), ['role_ids' => $roles])->assertSessionHasNoErrors();
+
+        expect(membershipOf($member)->roles()->orderBy('roles.id')->pluck('name')->all())->toBe(['Admin', 'Member']);
+    });
+
+    test('requires at least one role', function (): void {
+        $owner = organizationOwner();
+        $member = addMember($owner->currentOrganization, DefaultRole::Member);
+
+        $this->actingAs($owner)->patch(route('members.update', membershipOf($member)), ['role_ids' => []])
+            ->assertSessionHasErrors(['role_ids' => 'A member needs at least one role.']);
+
+        expect(membershipOf($member)->hasRole('Member'))->toBeTrue();
+    });
+
+    test('does not let an admin add a role carrying permissions they lack, but lets them keep it on someone', function (): void {
+        $organization = organizationOwner()->currentOrganization;
+        $admin = addMember($organization, DefaultRole::Admin);
+        $member = addMember($organization, DefaultRole::Member);
+        $deleter = Role::factory()->for($organization)->create();
+        $deleter->givePermissionTo(Permission::DeleteOrganization);
+
+        $memberRole = $organization->roles()->where('name', 'Member')->sole();
+
+        $this->actingAs($admin)->patch(route('members.update', membershipOf($member)), ['role_ids' => [$memberRole->id, $deleter->id]])
+            ->assertSessionHasErrors(['role_ids' => sprintf("You can't grant the %s role.", $deleter->name)]);
+        expect(membershipOf($member)->hasRole($deleter))->toBeFalse();
+
+        membershipOf($member)->assignRole($deleter);
+        $adminRole = $organization->roles()->where('name', 'Admin')->sole();
+
+        $this->actingAs($admin)->patch(route('members.update', membershipOf($member)), ['role_ids' => [$deleter->id, $adminRole->id]])
+            ->assertSessionHasNoErrors();
+        expect(membershipOf($member)->roles()->pluck('roles.id')->sort()->values()->all())->toBe(collect([$deleter->id, $adminRole->id])->sort()->values()->all());
     });
 
     test('lets one of two owners step another owner down', function (): void {
@@ -95,7 +138,7 @@ describe('update', function (): void {
         $coOwner = addMember($owner->currentOrganization, DefaultRole::Owner);
         $memberRole = $owner->currentOrganization->roles()->where('name', 'Member')->sole();
 
-        $this->actingAs($owner)->patch(route('members.update', membershipOf($coOwner)), ['role_id' => $memberRole->id])->assertSessionHasNoErrors();
+        $this->actingAs($owner)->patch(route('members.update', membershipOf($coOwner)), ['role_ids' => [$memberRole->id]])->assertSessionHasNoErrors();
 
         expect(membershipOf($coOwner)->hasRole('Owner'))->toBeFalse();
     });
@@ -104,9 +147,9 @@ describe('update', function (): void {
         $owner = organizationOwner();
         $memberRole = $owner->currentOrganization->roles()->where('name', 'Member')->sole();
 
-        $response = $this->actingAs($owner)->patch(route('members.update', membershipOf($owner)), ['role_id' => $memberRole->id]);
+        $response = $this->actingAs($owner)->patch(route('members.update', membershipOf($owner)), ['role_ids' => [$memberRole->id]]);
 
-        $response->assertSessionHasErrors(['role_id' => 'An organization needs at least one owner.']);
+        $response->assertSessionHasErrors(['role_ids' => 'An organization needs at least one owner.']);
 
         expect(membershipOf($owner)->hasRole('Owner'))->toBeTrue();
     });
@@ -117,9 +160,9 @@ describe('update', function (): void {
         $target = addMember($organization, $targetRole);
         $role = $organization->roles()->where('name', $newRole->value)->sole();
 
-        $response = $this->actingAs($admin)->patch(route('members.update', membershipOf($target)), ['role_id' => $role->id]);
+        $response = $this->actingAs($admin)->patch(route('members.update', membershipOf($target)), ['role_ids' => [$role->id]]);
 
-        $response->assertSessionHasErrors(['role_id' => 'Only owners can grant or remove the Owner role.']);
+        $response->assertSessionHasErrors(['role_ids' => 'Only owners can grant or remove the Owner role.']);
 
         expect(membershipOf($target)->hasRole($targetRole->value))->toBeTrue();
     })->with([
@@ -133,7 +176,7 @@ describe('update', function (): void {
         $other = addMember($organization, DefaultRole::Member);
 
         $this->actingAs($member)->patch(route('members.update', membershipOf($other)), [
-            'role_id' => $organization->roles()->where('name', 'Admin')->value('id'),
+            'role_ids' => [$organization->roles()->where('name', 'Admin')->value('id')],
         ])->assertForbidden();
     });
 });

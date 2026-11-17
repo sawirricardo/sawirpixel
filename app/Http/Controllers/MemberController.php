@@ -33,6 +33,7 @@ final class MemberController
         Gate::authorize('viewMembers', $organization);
 
         $canInvite = Gate::allows('inviteMembers', $organization);
+        $canManageRoles = Gate::allows('manageRoles', $organization);
 
         return Inertia::render('organizations/Members', [
             'organization' => ['id' => $organization->id, 'name' => $organization->name],
@@ -44,7 +45,7 @@ final class MemberController
                     'id' => $member->id,
                     'name' => $member->user->name ?? '',
                     'email' => $member->user->email ?? '',
-                    'role' => $member->roles->first()?->only(['id', 'name']),
+                    'role_ids' => $member->roles->pluck('id')->all(),
                     'roles' => $member->roles->pluck('name')->all(),
                     'permissions' => $member->permissions->map(fn (Permission $permission): string => $permission->name->label())->all(),
                     'is_you' => $member->user_id === $user->id,
@@ -61,14 +62,14 @@ final class MemberController
                     'expires_at' => $invitation->expires_at->toIso8601String(),
                 ]) : [],
             'roles' => $organization->roles()->oldest('id')->get(['id', 'name'])->map(fn (Role $role): array => $role->only(['id', 'name'])),
-            'grantable' => $canInvite ? [
+            'grantable' => $canInvite || $canManageRoles ? [
                 'roles' => array_map(fn (Role $role): array => $role->only(['id', 'name']), $grantableAccess->roles($user, $organization)),
                 'permissions' => array_map(fn (PermissionEnum $permission): array => ['value' => $permission->value, 'label' => $permission->label()], $grantableAccess->permissions($user, $organization)),
             ] : ['roles' => [], 'permissions' => []],
             'can' => [
                 'invite' => $canInvite,
                 'remove' => Gate::allows('removeMembers', $organization),
-                'manageRoles' => Gate::allows('manageRoles', $organization),
+                'manageRoles' => $canManageRoles,
             ],
         ]);
     }
@@ -78,7 +79,7 @@ final class MemberController
         $this->ensureInCurrentOrganization($user, $member);
         Gate::authorize('manageRoles', $member->organization);
 
-        $membership->changeRole($user, $member, $request->role());
+        $membership->changeRoles($user, $member, $request->roles());
 
         return back();
     }

@@ -9,6 +9,9 @@ use App\Models\User;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
+/**
+ * The complete set of roles a member should have; at least one.
+ */
 final class UpdateMemberRequest extends FormRequest
 {
     /**
@@ -17,13 +20,31 @@ final class UpdateMemberRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'role_id' => ['required', 'integer', Rule::exists(Role::class, 'id')->where('organization_id', $this->organizationId())],
+            'role_ids' => ['required', 'array', 'min:1'],
+            'role_ids.*' => ['integer', 'distinct', Rule::exists(Role::class, 'id')->where('organization_id', $this->organizationId())],
         ];
     }
 
-    public function role(): Role
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
     {
-        return Role::query()->where('organization_id', $this->organizationId())->findOrFail($this->integer('role_id'));
+        return [
+            'role_ids.required' => 'A member needs at least one role.',
+        ];
+    }
+
+    /**
+     * @return list<Role>
+     */
+    public function roles(): array
+    {
+        return array_values(Role::query()
+            ->where('organization_id', $this->organizationId())
+            ->whereIn('id', $this->array('role_ids'))
+            ->get()
+            ->all());
     }
 
     private function organizationId(): ?int
