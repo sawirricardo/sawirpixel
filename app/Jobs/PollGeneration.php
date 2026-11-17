@@ -14,6 +14,7 @@ use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Attributes\Backoff;
+use Illuminate\Queue\Middleware\RateLimited;
 
 /**
  * Fallback for missed or delayed webhooks: checks the generation until it is final.
@@ -26,6 +27,16 @@ final class PollGeneration implements ShouldBeUnique, ShouldQueue
     public const int INTERVAL_SECONDS = 10;
 
     public function __construct(public Generation $generation) {}
+
+    /**
+     * Polls share Pixelforge's per-account request limit with submissions.
+     *
+     * @return list<object>
+     */
+    public function middleware(): array
+    {
+        return [new RateLimited('pixelforge')];
+    }
 
     public function uniqueId(): string
     {

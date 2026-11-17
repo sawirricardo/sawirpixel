@@ -17,6 +17,7 @@ use Carbon\CarbonImmutable;
 use Dedoc\Scramble\Scramble;
 use Dedoc\Scramble\Support\Generator\OpenApi;
 use Dedoc\Scramble\Support\Generator\SecuritySchemes\HttpSecurityScheme;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Database\Eloquent\Model;
@@ -26,6 +27,7 @@ use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\ServiceProvider;
@@ -87,6 +89,8 @@ final class AppServiceProvider extends ServiceProvider
             $app->make(Dispatcher::class),
             $app->make(PixelforgeClient::class),
         ));
+
+        RateLimiter::for('pixelforge', fn (): Limit => Limit::perMinute(config()->integer('services.pixelforge.requests_per_minute')));
 
         Gate::define('viewApiDocs', fn (User $user): bool => $user->isSuperAdmin());
         Gate::define('viewHorizon', fn (User $user): bool => $user->isSuperAdmin());

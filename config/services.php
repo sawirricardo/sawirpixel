@@ -27,6 +27,10 @@ return [
         'webhook_tolerance' => (int) env('PIXELFORGE_WEBHOOK_TOLERANCE', 300),
         'timeout' => (int) env('PIXELFORGE_TIMEOUT', 15),
         'markup' => env('PIXELFORGE_MARKUP', '1.25'),
+        // Pixelforge's per-account limits: generations queued or processing at once, and API requests
+        // per minute (kept a little under the documented 60 to leave headroom).
+        'max_concurrent_generations' => (int) env('PIXELFORGE_MAX_CONCURRENT', 3),
+        'requests_per_minute' => (int) env('PIXELFORGE_REQUESTS_PER_MINUTE', 55),
     ],
 
     'resend' => [

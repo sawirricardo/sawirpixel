@@ -49,10 +49,18 @@ final class PixelforgeException extends RuntimeException
     }
 
     /**
-     * Rate limits and server errors are worth retrying; client errors are not.
+     * The account has used its generations for the UTC day; retrying within minutes will not help.
+     */
+    public function isDailyLimit(): bool
+    {
+        return $this->isRateLimited() && $this->errorCode === 'daily_limit_exceeded';
+    }
+
+    /**
+     * Rate limits and server errors are worth retrying soon; client errors and the daily limit are not.
      */
     public function isTransient(): bool
     {
-        return $this->isRateLimited() || $this->status >= 500;
+        return ($this->isRateLimited() && ! $this->isDailyLimit()) || $this->status >= 500;
     }
 }
