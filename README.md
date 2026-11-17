@@ -76,6 +76,15 @@ Pixelforge's test directives make each scenario deterministic: put one at the st
    (`/admin/users`) shows every account's spend and balances. Horizon is at `/admin/horizon`.
 8. **Teams.** In organization settings: invite members with roles, set spending and image limits,
    restrict qualities or sizes for members, or delete the organization.
+9. **API.** In your profile, generate a personal access token (pick its organization, scopes and
+   expiry; the secret is shown once), then call the API with it. The docs are at `/docs/api`.
+
+   ```bash
+   curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/credits
+   curl -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+        -d '{"prompt":"[succeed] A lighthouse at dusk","size":"1024x1024","quality":"low"}' \
+        http://localhost:8000/api/generations          # 202, with a Location header to poll
+   ```
 
 ---
 
@@ -126,6 +135,22 @@ actual charge and when its image link expires. `/credits` is the full ledger.
 `app/Services/Reporting/ProfitReport.php` sums revenue and our recorded Pixelforge cost per day, and
 compares each day with Pixelforge's `GET /v1/usage`, flagging any day that doesn't match.
 
+### API
+
+Personal access tokens (Sanctum) are managed GitHub-style in the profile: each is bound to one
+organization and limited to its scopes (`generations:read`, `generations:create`, `credits:read`).
+Responses follow JSON:API. Generating through the API uses the same action as the web app, so limits,
+holds and charges behave identically; running out of credits answers `402 Payment Required`. Tokens
+can only be managed from a logged-in session, never with a token.
+
+| Endpoint | Scope |
+|---|---|
+| `GET /api/user` | any |
+| `POST /api/estimates` | `generations:read` |
+| `GET /api/generations`, `GET /api/generations/{id}` | `generations:read` |
+| `POST /api/generations` | `generations:create` |
+| `GET /api/credits` | `credits:read` |
+
 ### Credits
 
 Each organization has a balance and an append-only ledger (`credit_transactions`): purchase, hold,
@@ -145,6 +170,7 @@ balance is only changed with the organization's row locked (`app/Services/Billin
 | Limits | `app/Services/Generations/GenerationLimiter.php` |
 | Threads (continue and branch) | `app/Services/Generations/GenerationThread.php` |
 | Roles and permissions | `app/Models/Concerns/HasRoles.php`, `app/Enums/Permission.php`, `app/Policies/` |
+| API and tokens | `routes/api.php`, `app/Http/Controllers/Api/`, `app/Http/Resources/`, `app/Actions/IssuePersonalAccessToken.php` |
 | Reporting | `app/Services/Reporting/` |
 | Front end | `resources/js/pages/`, `resources/js/lib/` |
 
@@ -165,7 +191,7 @@ The lifecycles that drive behaviour are explicit, each with its diagram in a doc
 ## Tests and quality gates
 
 ```bash
-php artisan test --compact      # 373 tests
+php artisan test --compact      # 407 tests
 composer test                   # everything below, then the suite
 composer test:types             # PHPStan (Larastan, level max)
 composer test:type-coverage     # 100% type coverage
