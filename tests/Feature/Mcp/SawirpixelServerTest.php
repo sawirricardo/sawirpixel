@@ -162,6 +162,8 @@ describe('tools', function (): void {
 describe('over HTTP', function (): void {
     test('needs a token', function (): void {
         $this->postJson('/mcp', ['jsonrpc' => '2.0', 'id' => 1, 'method' => 'tools/list'])->assertUnauthorized();
+        // Even for a client that doesn't ask for JSON: an API endpoint never redirects to a login page.
+        $this->call('POST', '/mcp', [], [], [], ['CONTENT_TYPE' => 'application/json'], '{}')->assertUnauthorized();
     });
 
     test('lists the tools to a client with a token', function (): void {
