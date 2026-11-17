@@ -56,5 +56,5 @@ test('lists only the public pages in the sitemap', function (): void {
     $response->assertOk()->assertHeader('Content-Type', 'application/xml; charset=UTF-8');
     $xml = simplexml_load_string((string) $response->getContent());
     expect(array_map(fn (SimpleXMLElement $url): string => (string) $url->loc, iterator_to_array($xml->url, false)))
-        ->toBe([route('home'), route('login'), route('register')]);
+        ->toBe([route('home'), route('login'), route('register'), route('terms'), route('privacy')]);
 });

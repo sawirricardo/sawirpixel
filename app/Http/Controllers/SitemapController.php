@@ -15,7 +15,7 @@ final class SitemapController
     {
         $urls = array_map(
             fn (string $route): string => sprintf('  <url><loc>%s</loc></url>', e(route($route))),
-            ['home', 'login', 'register'],
+            ['home', 'login', 'register', 'terms', 'privacy'],
         );
 
         $xml = implode("\n", [

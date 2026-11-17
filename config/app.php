@@ -31,6 +31,22 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Legal
+    |--------------------------------------------------------------------------
+    |
+    | Who runs the service and where people can reach them, as stated in the
+    | terms of service and privacy policy.
+    |
+    */
+
+    'legal' => [
+        'operator' => env('LEGAL_OPERATOR', 'Sawir Studio'),
+        'contact_email' => env('LEGAL_CONTACT_EMAIL'),
+        'updated_at' => '2026-11-17',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Environment
     |--------------------------------------------------------------------------
     |
