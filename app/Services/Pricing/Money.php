@@ -38,4 +38,13 @@ final class Money
             'formatted' => self::format($amount),
         ];
     }
+
+    /**
+     * An amount summed by the database. Postgres sums numeric columns exactly and returns them as
+     * strings; an empty set sums to NULL, which is zero.
+     */
+    public static function ofSum(mixed $sum): BigDecimal
+    {
+        return is_string($sum) || is_int($sum) ? BigDecimal::of($sum) : BigDecimal::zero();
+    }
 }

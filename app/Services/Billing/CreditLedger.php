@@ -10,14 +10,16 @@ use App\Models\CreditTransaction;
 use App\Models\Generation;
 use App\Models\Organization;
 use App\Models\User;
+use App\Services\Pricing\Money;
 use Brick\Math\BigDecimal;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 
 /**
  * Every change to an organization's credits goes through here: one ledger row per change, and the
  * cached organizations.credit_balance updated in the same transaction while the organization's row is
- * locked. All arithmetic is exact (brick/math in PHP), never SQL, which would use floats on SQLite.
+ * locked. Balance arithmetic is exact (brick/math in PHP); totals are exact numeric sums in Postgres.
  *
  * Lock order is always generation, then organization, to avoid deadlocks with result handling.
  */
@@ -99,18 +101,18 @@ final readonly class CreditLedger
      */
     public function reserved(Organization $organization): BigDecimal
     {
-        $released = CreditTransaction::query()
-            ->where('organization_id', $organization->id)
-            ->where('type', CreditTransactionType::HoldRelease)
-            ->pluck('generation_id')
-            ->all();
-
-        return CreditTransaction::query()
+        // Holds are negative entries; a hold still counts until its generation has a release.
+        $holds = CreditTransaction::query()
             ->where('organization_id', $organization->id)
             ->where('type', CreditTransactionType::Hold)
-            ->whereNotIn('generation_id', $released)
-            ->pluck('amount')
-            ->reduce(fn (BigDecimal $sum, mixed $amount): BigDecimal => $sum->minus(BigDecimal::of(is_string($amount) ? $amount : '0')), BigDecimal::zero());
+            ->whereNotExists(fn (QueryBuilder $releases): QueryBuilder => $releases
+                ->selectRaw('1')
+                ->from('credit_transactions as releases')
+                ->whereColumn('releases.generation_id', 'credit_transactions.generation_id')
+                ->where('releases.type', CreditTransactionType::HoldRelease->value))
+            ->sum('amount');
+
+        return Money::ofSum($holds)->negated();
     }
 
     private function record(Organization $lockedOrganization, CreditTransactionType $type, BigDecimal $amount, ?int $userId, ?int $generationId = null, ?string $purchaseKey = null): CreditTransaction

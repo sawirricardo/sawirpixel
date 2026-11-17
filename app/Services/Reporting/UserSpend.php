@@ -6,7 +6,6 @@ namespace App\Services\Reporting;
 
 use App\Enums\GenerationStatus;
 use App\Models\Generation;
-use Brick\Math\BigDecimal;
 
 /**
  * Exact lifetime totals of what users were charged and what Pixelforge charged for them. Summed in PHP
@@ -26,17 +25,19 @@ final readonly class UserSpend
             $tallies[$userId] = new ProfitTally;
         }
 
-        Generation::query()
+        // Summed by Postgres over numeric columns, which is exact.
+        $rows = Generation::query()
             ->whereIn('user_id', $userIds)
             ->where('status', GenerationStatus::Succeeded)
-            ->select(['id', 'user_id', 'charge', 'provider_cost'])
-            ->lazyById()
-            ->each(function (Generation $generation) use (&$tallies): void {
-                $tallies[$generation->user_id]->add(
-                    BigDecimal::of($generation->charge ?? '0'),
-                    BigDecimal::of($generation->provider_cost ?? '0'),
-                );
-            });
+            ->toBase()
+            ->selectRaw('user_id, count(*) as generations, sum(charge) as charged, sum(provider_cost) as provider_cost')
+            ->groupBy('user_id')
+            ->get();
+
+        foreach ($rows as $row) {
+            $userId = is_numeric($row->user_id) ? (int) $row->user_id : 0;
+            $tallies[$userId] = ProfitTally::fromSums($row->generations, $row->charged, $row->provider_cost);
+        }
 
         return $tallies;
     }

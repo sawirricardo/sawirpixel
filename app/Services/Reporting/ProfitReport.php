@@ -6,6 +6,7 @@ namespace App\Services\Reporting;
 
 use App\Enums\GenerationStatus;
 use App\Models\Generation;
+use App\Models\User;
 use App\Services\Pixelforge\Data\UsageReport;
 use Brick\Math\BigDecimal;
 use Carbon\CarbonImmutable;
@@ -37,28 +38,20 @@ final readonly class ProfitReport
             $days[$day->toDateString()] = new ProfitTally;
         }
 
-        /** @var array<int, array{name: string, email: string, tally: ProfitTally}> $users */
-        $users = [];
-        $totals = new ProfitTally;
+        // Totals are summed by Postgres over numeric columns, which is exact. Days are UTC dates of completed_at.
+        $billed = $this->billedGenerations($startDate, $endDate)->reorder()->toBase();
+        $sums = 'count(*) as generations, sum(charge) as charged, sum(provider_cost) as provider_cost';
+        $day = "to_char(completed_at, 'YYYY-MM-DD')";
 
-        foreach ($this->billedGenerations($startDate, $endDate)->with('user:id,name,email')->get() as $generation) {
-            // The query only returns generations that completed inside the range, so every date has a bucket.
-            $date = (string) $generation->completed_at?->utc()->toDateString();
-            $days[$date] ??= new ProfitTally;
-
-            $charged = BigDecimal::of($generation->charge ?? '0');
-            $providerCost = BigDecimal::of($generation->provider_cost ?? '0');
-
-            $users[$generation->user_id] ??= [
-                'name' => $generation->user->name ?? '',
-                'email' => $generation->user->email ?? '',
-                'tally' => new ProfitTally,
-            ];
-
-            $days[$date]->add($charged, $providerCost);
-            $users[$generation->user_id]['tally']->add($charged, $providerCost);
-            $totals->add($charged, $providerCost);
+        foreach ((clone $billed)->selectRaw($day.' as day, '.$sums)->groupByRaw($day)->get() as $row) {
+            $days[is_string($row->day) ? $row->day : ''] = ProfitTally::fromSums($row->generations, $row->charged, $row->provider_cost);
         }
+
+        $total = (clone $billed)->selectRaw($sums)->first();
+        $totals = ProfitTally::fromSums($total?->generations, $total?->charged, $total?->provider_cost);
+
+        $perUser = (clone $billed)->selectRaw('user_id, '.$sums)->groupBy('user_id')->orderByDesc('charged')->orderBy('user_id')->get();
+        $people = User::query()->whereIn('id', $perUser->pluck('user_id')->all())->get(['id', 'name', 'email'])->keyBy('id');
 
         $dayRows = [];
         $matched = 0;
@@ -84,12 +77,17 @@ final readonly class ProfitReport
             $dayRows[] = ['date' => $date, ...$tally->toArray(), 'pixelforge' => $comparison];
         }
 
-        uasort($users, fn (array $a, array $b): int => $b['tally']->charged->compareTo($a['tally']->charged));
-
         $userRows = [];
 
-        foreach ($users as $userId => $user) {
-            $userRows[] = ['user_id' => $userId, 'name' => $user['name'], 'email' => $user['email'], ...$user['tally']->toArray()];
+        foreach ($perUser as $row) {
+            $userId = is_numeric($row->user_id) ? (int) $row->user_id : 0;
+            $person = $people->get($userId);
+            $userRows[] = [
+                'user_id' => $userId,
+                'name' => $person->name ?? '',
+                'email' => $person->email ?? '',
+                ...ProfitTally::fromSums($row->generations, $row->charged, $row->provider_cost)->toArray(),
+            ];
         }
 
         return [

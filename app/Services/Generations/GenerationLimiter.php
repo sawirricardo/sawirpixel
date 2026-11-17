@@ -16,15 +16,16 @@ use App\Services\Pricing\Money;
 use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
 use Carbon\CarbonImmutable;
-use Illuminate\Support\Collection;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Gate;
 
 /**
  * An organization's limits on generating: what it may spend and how many images it may make per UTC day
  * and month, the same for each member, and which qualities and sizes members may use.
  *
- * Usage is worked out from the generations themselves: a finished image counts what it was charged, one
- * in progress counts the most it can cost (what's held for it), and a failed one counts nothing. So a late
+ * Usage is worked out from the generations themselves, summed exactly by Postgres: a finished image counts
+ * what it was charged, one in progress counts the most it can cost (what's held for it), and a failed one
+ * counts nothing. So a late
  * failure frees its share by itself. Members who can change the organization's settings are exempt from
  * the member limits, since they could lift them anyway; the organization's own limits apply to everyone.
  *
@@ -49,26 +50,29 @@ final readonly class GenerationLimiter
         }
 
         $now = CarbonImmutable::now('UTC');
-        $thisMonth = $this->countedGenerations($organization, $now->startOfMonth());
-        $today = $thisMonth->filter(fn (Generation $generation): bool => $generation->created_at !== null && $generation->created_at->greaterThanOrEqualTo($now->startOfDay()));
         $fix = Gate::forUser($user)->allows('update', $organization) ? 'Change it in organization settings.' : 'Ask an owner or admin to raise it.';
 
         $checks = [
-            [$organization->spend_limit_monthly, $organization->generation_limit_monthly, $thisMonth, 'month', false],
-            [$organization->spend_limit_daily, $organization->generation_limit_daily, $today, 'day', false],
+            [$organization->spend_limit_monthly, $organization->generation_limit_monthly, $now->startOfMonth(), 'month', null],
+            [$organization->spend_limit_daily, $organization->generation_limit_daily, $now->startOfDay(), 'day', null],
         ];
 
         if ($isMemberLimited) {
-            $mine = fn (Collection $generations): Collection => $generations->where('user_id', $user->id);
-            $checks[] = [$organization->member_spend_limit_monthly, $organization->member_generation_limit_monthly, $mine($thisMonth), 'month', true];
-            $checks[] = [$organization->member_spend_limit_daily, $organization->member_generation_limit_daily, $mine($today), 'day', true];
+            $checks[] = [$organization->member_spend_limit_monthly, $organization->member_generation_limit_monthly, $now->startOfMonth(), 'month', $user];
+            $checks[] = [$organization->member_spend_limit_daily, $organization->member_generation_limit_daily, $now->startOfDay(), 'day', $user];
         }
 
-        foreach ($checks as [$spendLimit, $countLimit, $generations, $period, $perMember]) {
+        foreach ($checks as [$spendLimit, $countLimit, $since, $period, $member]) {
+            if ($spendLimit === null && $countLimit === null) {
+                continue;
+            }
+
+            $perMember = $member instanceof User;
+            $used = $this->usedSince($organization, $since, $member);
             $who = $perMember ? sprintf('You can %%s in %s', $organization->name) : $organization->name.' can %s';
             $resets = $period === 'day' ? 'at midnight UTC' : 'on '.$now->startOfMonth()->addMonth()->format('j F');
 
-            if ($countLimit !== null && $generations->count() + 1 > $countLimit) {
+            if ($countLimit !== null && $countLimit < $used['generations'] + 1) {
                 return sprintf(
                     '%s, and %s. The limit resets %s. %s',
                     sprintf($who, sprintf('generate up to %d %s a %s', $countLimit, $countLimit === 1 ? 'image' : 'images', $period)),
@@ -79,7 +83,7 @@ final readonly class GenerationLimiter
             }
 
             if ($spendLimit !== null) {
-                $spent = $this->spent($generations);
+                $spent = $used['spent'];
 
                 if ($spent->plus($chargeMax)->isGreaterThan(BigDecimal::of($spendLimit))) {
                     return sprintf(
@@ -129,12 +133,10 @@ final readonly class GenerationLimiter
     public function usage(Organization $organization): array
     {
         $now = CarbonImmutable::now('UTC');
-        $thisMonth = $this->countedGenerations($organization, $now->startOfMonth());
-        $today = $thisMonth->filter(fn (Generation $generation): bool => $generation->created_at !== null && $generation->created_at->greaterThanOrEqualTo($now->startOfDay()));
 
         return [
-            'day' => ['spent' => $this->spent($today), 'generations' => $today->count()],
-            'month' => ['spent' => $this->spent($thisMonth), 'generations' => $thisMonth->count()],
+            'day' => $this->usedSince($organization, $now->startOfDay()),
+            'month' => $this->usedSince($organization, $now->startOfMonth()),
         ];
     }
 
@@ -146,29 +148,29 @@ final readonly class GenerationLimiter
     }
 
     /**
-     * Generations since the start of the period that count against limits: everything but failures.
+     * What the organization (or one member) has used since the start of a period: generations that
+     * count against limits (everything but failures), and what they cost. A finished image counts what it
+     * was charged; one in progress counts the most it can cost. Postgres sums the numeric columns exactly.
      *
-     * @return Collection<int, Generation>
+     * @return array{spent: BigDecimal, generations: int}
      */
-    private function countedGenerations(Organization $organization, CarbonImmutable $since): Collection
+    private function usedSince(Organization $organization, CarbonImmutable $since, ?User $member = null): array
     {
-        return Generation::query()
+        $row = Generation::query()
             ->where('organization_id', $organization->id)
             ->where('created_at', '>=', $since)
             ->where('status', '!=', GenerationStatus::Failed)
-            ->get(['id', 'user_id', 'status', 'charge', 'estimated_charge_max', 'created_at']);
-    }
+            ->when($member instanceof User, fn (Builder $query): Builder => $query->where('user_id', $member?->id))
+            ->toBase()
+            ->selectRaw(
+                'count(*) as generations, sum(case when status = ? then coalesce(charge, 0) else estimated_charge_max end) as spent',
+                [GenerationStatus::Succeeded->value],
+            )
+            ->first();
 
-    /**
-     * @param  Collection<int, Generation>  $generations
-     */
-    private function spent(Collection $generations): BigDecimal
-    {
-        return $generations->reduce(
-            fn (BigDecimal $sum, Generation $generation): BigDecimal => $sum->plus(
-                $generation->status === GenerationStatus::Succeeded ? ($generation->charge ?? '0') : $generation->estimated_charge_max,
-            ),
-            BigDecimal::zero(),
-        );
+        return [
+            'spent' => Money::ofSum($row?->spent),
+            'generations' => is_numeric($row?->generations) ? (int) $row->generations : 0,
+        ];
     }
 }

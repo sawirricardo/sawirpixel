@@ -8,7 +8,7 @@ use App\Services\Pricing\Money;
 use Brick\Math\BigDecimal;
 
 /**
- * A running total of billed generations: what users were charged and what Pixelforge charged us.
+ * A total of billed generations: how many, what users were charged and what Pixelforge charged us.
  */
 final class ProfitTally
 {
@@ -24,11 +24,17 @@ final class ProfitTally
         $this->providerCost = BigDecimal::zero();
     }
 
-    public function add(BigDecimal $charged, BigDecimal $providerCost): void
+    /**
+     * A tally from a row of database aggregates: count(*), sum(charge) and sum(provider_cost).
+     */
+    public static function fromSums(mixed $generations, mixed $charged, mixed $providerCost): self
     {
-        $this->generations++;
-        $this->charged = $this->charged->plus($charged);
-        $this->providerCost = $this->providerCost->plus($providerCost);
+        $tally = new self;
+        $tally->generations = is_numeric($generations) ? (int) $generations : 0;
+        $tally->charged = Money::ofSum($charged);
+        $tally->providerCost = Money::ofSum($providerCost);
+
+        return $tally;
     }
 
     public function profit(): BigDecimal

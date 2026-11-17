@@ -75,14 +75,13 @@ final class CreditController
     }
 
     /**
-     * Exact lifetime total of one kind of entry, summed in PHP rather than SQL (floats on SQLite).
+     * Exact lifetime total of one kind of entry: a numeric sum in Postgres.
      */
     private function total(Organization $organization, CreditTransactionType $type): BigDecimal
     {
-        return CreditTransaction::query()
+        return Money::ofSum(CreditTransaction::query()
             ->where('organization_id', $organization->id)
             ->where('type', $type)
-            ->pluck('amount')
-            ->reduce(fn (BigDecimal $sum, mixed $amount): BigDecimal => $sum->plus(BigDecimal::of(is_string($amount) ? $amount : '0')), BigDecimal::zero());
+            ->sum('amount'));
     }
 }
