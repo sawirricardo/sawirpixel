@@ -95,3 +95,21 @@ test('lists only the public pages in the sitemap', function (): void {
     expect(array_map(fn (SimpleXMLElement $url): string => (string) $url->loc, iterator_to_array($xml->url, false)))
         ->toBe([route('home'), route('login'), route('register'), route('terms'), route('privacy')]);
 });
+
+test('describes the service as Markdown to agents, and as HTML to browsers', function (): void {
+    config()->set('app.name', 'Sawirpixel');
+
+    $markdown = $this->get(route('home'), ['Accept' => 'text/markdown, text/html;q=0.5']);
+    $browser = $this->get(route('home'), ['Accept' => 'text/html,application/xhtml+xml,*/*;q=0.8']);
+
+    $markdown->assertOk()->assertHeader('Content-Type', 'text/markdown; charset=utf-8')->assertHeaderContains('Vary', 'Accept');
+    expect($markdown->getContent())->toStartWith("# Sawirpixel\n\n")->toContain('/.well-known/api-catalog');
+    $browser->assertOk()->assertHeaderContains('Vary', 'Accept');
+    expect($browser->headers->get('Content-Type'))->toStartWith('text/html');
+});
+
+test('never answers an Inertia visit with Markdown', function (): void {
+    $response = $this->get(route('terms'), ['Accept' => 'text/markdown', 'X-Inertia' => 'true']);
+
+    expect((string) $response->headers->get('Content-Type'))->not->toContain('markdown');
+});

@@ -37,15 +37,16 @@ use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\RegeneratePersonalAccessTokenController;
 use App\Http\Controllers\SitemapController;
 use App\Http\Middleware\AdvertiseDiscovery;
+use App\Http\Middleware\NegotiateMarkdown;
 use App\Http\Middleware\NoIndex;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', HomeController::class)->middleware(AdvertiseDiscovery::class)->name('home');
+Route::get('/', HomeController::class)->middleware([AdvertiseDiscovery::class, NegotiateMarkdown::class.':home'])->name('home');
 Route::get('/robots.txt', RobotsController::class)->name('robots');
 Route::get('/sitemap.xml', SitemapController::class)->name('sitemap');
 Route::get('/.well-known/api-catalog', ApiCatalogController::class)->name('api-catalog');
-Route::get('/terms', [LegalController::class, 'show'])->defaults('document', 'terms')->middleware(AdvertiseDiscovery::class)->name('terms');
-Route::get('/privacy', [LegalController::class, 'show'])->defaults('document', 'privacy')->middleware(AdvertiseDiscovery::class)->name('privacy');
+Route::get('/terms', [LegalController::class, 'show'])->defaults('document', 'terms')->middleware([AdvertiseDiscovery::class, NegotiateMarkdown::class.':terms'])->name('terms');
+Route::get('/privacy', [LegalController::class, 'show'])->defaults('document', 'privacy')->middleware([AdvertiseDiscovery::class, NegotiateMarkdown::class.':privacy'])->name('privacy');
 
 Route::post('/generations/estimate', GenerationEstimateController::class)
     ->middleware('throttle:60,1')

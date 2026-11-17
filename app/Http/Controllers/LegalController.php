@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Services\Agents\MarkdownPages;
 use Illuminate\Support\Facades\Config;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -14,7 +15,7 @@ use Inertia\Response;
  */
 final class LegalController
 {
-    public function show(string $document): Response
+    public function show(string $document, MarkdownPages $pages): Response
     {
         abort_unless(in_array($document, ['terms', 'privacy'], true), 404);
 
@@ -25,6 +26,8 @@ final class LegalController
             'operator' => Config::string('app.legal.operator'),
             'contactEmail' => is_string($contactEmail) && $contactEmail !== '' ? $contactEmail : null,
             'updatedAt' => Config::string('app.legal.updated_at'),
+            // The text itself, rendered from resources/markdown, the same source agents get as Markdown.
+            'html' => $pages->html($document),
         ]);
     }
 }
