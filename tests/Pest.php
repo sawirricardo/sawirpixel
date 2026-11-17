@@ -130,11 +130,14 @@ function addMember(Organization $organization, DefaultRole $role, ?User $user = 
 }
 
 /**
- * Add credits to an organization through the ledger, as a purchase.
+ * Add credits to an organization through the ledger, as a purchase by its first member (or a new user
+ * if it has none).
  */
 function fundOrganization(Organization $organization, string $amount): void
 {
-    resolve(CreditLedger::class)->purchase($organization, User::factory()->create(), BigDecimal::of($amount), (string) Str::uuid());
+    $buyer = $organization->orgUsers()->oldest('id')->first()?->user()->first() ?? User::factory()->create();
+
+    resolve(CreditLedger::class)->purchase($organization, $buyer, BigDecimal::of($amount), (string) Str::uuid());
 }
 
 /**

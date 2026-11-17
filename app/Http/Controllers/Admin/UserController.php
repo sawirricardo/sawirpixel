@@ -6,9 +6,11 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Requests\AdminUserIndexRequest;
 use App\Models\Generation;
+use App\Models\Organization;
 use App\Models\OrgUser;
 use App\Models\Permission;
 use App\Models\User;
+use App\Services\Billing\CreditLedger;
 use App\Services\Pricing\Money;
 use App\Services\Reporting\UserSpend;
 use Illuminate\Database\Eloquent\Builder;
@@ -34,6 +36,7 @@ final class UserController
                     ->whereLike('name', "%{$search}%")
                     ->orWhereLike('email', "%{$search}%"),
             ))
+            ->with('currentOrganization:id,name,credit_balance')
             ->withCount(['orgUsers', 'generations'])
             ->latest('id')
             ->paginate(self::PER_PAGE)
@@ -51,6 +54,10 @@ final class UserController
                 'organizations' => $user->org_users_count,
                 'generations' => $user->generations_count,
                 'charged' => $tallies[$user->id]->toArray()['charged'],
+                'current_organization' => $user->currentOrganization instanceof Organization ? [
+                    'name' => $user->currentOrganization->name,
+                    'credit_balance' => Money::toArray($user->currentOrganization->credit_balance),
+                ] : null,
                 'joined_at' => $user->created_at?->toIso8601String(),
             ]),
         ]);
@@ -60,12 +67,12 @@ final class UserController
      * The user is looked up here rather than through route model binding, so the admin gate on the
      * route group runs first and non-operators can't probe which user ids exist.
      */
-    public function show(string $user, UserSpend $spend): Response
+    public function show(string $user, UserSpend $spend, CreditLedger $ledger): Response
     {
         $user = User::query()->findOrFail($user);
 
         $memberships = $user->orgUsers()
-            ->with(['organization:id,name', 'roles:id,name', 'permissions'])
+            ->with(['organization:id,name,credit_balance', 'roles:id,name', 'permissions'])
             ->oldest('id')
             ->get();
 
@@ -83,6 +90,8 @@ final class UserController
             'memberships' => $memberships->map(fn (OrgUser $membership): array => [
                 'organization_id' => $membership->organization_id,
                 'organization' => $membership->organization->name ?? '',
+                'credit_balance' => Money::toArray($membership->organization->credit_balance ?? '0'),
+                'credits_reserved' => Money::toArray($membership->organization instanceof Organization ? $ledger->reserved($membership->organization) : '0'),
                 'roles' => $membership->roles->pluck('name')->all(),
                 'permissions' => $membership->permissions->map(fn (Permission $permission): string => $permission->name->label())->all(),
                 'joined_at' => $membership->created_at?->toIso8601String(),

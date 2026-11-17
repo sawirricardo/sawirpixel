@@ -14,6 +14,7 @@ const props = defineProps<{
         organizations: number;
         generations: number;
         charged: Money;
+        current_organization: { name: string; credit_balance: Money } | null;
         joined_at: string | null;
     }>;
 }>();
@@ -79,12 +80,15 @@ function formatDate(date: string | null): string {
                         <th class="px-4 py-2 text-right font-medium">
                             Charged
                         </th>
+                        <th class="px-4 py-2 text-right font-medium">
+                            Credits
+                        </th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-zinc-100">
                     <tr v-if="users.data.length === 0">
                         <td
-                            colspan="5"
+                            colspan="6"
                             class="px-4 py-6 text-center text-zinc-500"
                         >
                             No users found.
@@ -126,6 +130,22 @@ function formatDate(date: string | null): string {
                             :title="`$${user.charged.amount}`"
                         >
                             {{ user.charged.formatted }}
+                        </td>
+                        <td class="px-4 py-2 text-right tabular-nums">
+                            <template v-if="user.current_organization">
+                                <span
+                                    :title="`$${user.current_organization.credit_balance.amount}`"
+                                >
+                                    {{
+                                        user.current_organization.credit_balance
+                                            .formatted
+                                    }}
+                                </span>
+                                <span class="block text-xs text-zinc-500">{{
+                                    user.current_organization.name
+                                }}</span>
+                            </template>
+                            <span v-else class="text-zinc-400">—</span>
                         </td>
                     </tr>
                 </tbody>

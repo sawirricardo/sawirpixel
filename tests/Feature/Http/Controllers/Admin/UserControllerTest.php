@@ -8,6 +8,8 @@ use App\Enums\Permission;
 use App\Models\Generation;
 use App\Models\Organization;
 use App\Models\User;
+use App\Services\Billing\CreditLedger;
+use Brick\Math\BigDecimal;
 use Inertia\Testing\AssertableInertia as Assert;
 
 beforeEach(function (): void {
@@ -33,7 +35,9 @@ describe('index', function (): void {
     test('lists every account newest first with exact lifetime charges', function (): void {
         $operator = adminOperator();
         $ada = User::factory()->create(['name' => 'Ada', 'email' => 'ada@example.com']);
-        addMember(Organization::factory()->create(), DefaultRole::Member, $ada);
+        $studio = Organization::factory()->create(['name' => 'Studio']);
+        addMember($studio, DefaultRole::Member, $ada);
+        fundOrganization($studio, '12.5');
         billedGeneration($ada, '0.3818875000', '0.305510000');
         billedGeneration($ada, '0.0140000000', '0.011200000');
         Generation::factory()->for($ada)->create(['status' => GenerationStatus::Failed, 'charge' => '0']);
@@ -48,6 +52,8 @@ describe('index', function (): void {
             ->where('users.data.0.generations', 3)
             ->where('users.data.0.charged', ['amount' => '0.3958875000', 'formatted' => '$0.40'])
             ->where('users.data.0.is_super_admin', false)
+            ->where('users.data.0.current_organization', ['name' => 'Studio', 'credit_balance' => ['amount' => '12.5000000000', 'formatted' => '$12.50']])
+            ->where('users.data.1.current_organization', null)
             ->where('users.data.1.email', 'ops@example.com')
             ->where('users.data.1.is_super_admin', true)
             ->where('users.data.1.charged', ['amount' => '0', 'formatted' => '$0.00']));
@@ -89,6 +95,11 @@ describe('show', function (): void {
         $studio = Organization::factory()->create(['name' => 'Studio']);
         addMember($studio, DefaultRole::Admin, $ada);
         $ada->membershipIn($studio)?->givePermissionTo(Permission::DeleteOrganization);
+        fundOrganization($studio, '2');
+        $inProgress = Generation::factory()->queued()->for($ada)->for($studio)->create();
+        $ledger = resolve(CreditLedger::class);
+        $ledger->hold($ledger->lockOrganization($studio->id), $inProgress, BigDecimal::of('0.5'));
+
         $generation = billedGeneration($ada, '0.3818875000', '0.305510000');
 
         $response = $this->actingAs($operator)->get(route('admin.users.show', $ada));
@@ -104,11 +115,13 @@ describe('show', function (): void {
             ->where('memberships', [[
                 'organization_id' => $studio->id,
                 'organization' => 'Studio',
+                'credit_balance' => ['amount' => '1.5000000000', 'formatted' => '$1.50'],
+                'credits_reserved' => ['amount' => '0.5000000000', 'formatted' => '$0.50'],
                 'roles' => ['Admin'],
                 'permissions' => ['Delete the organization'],
                 'joined_at' => $ada->membershipIn($studio)?->created_at?->toIso8601String(),
             ]])
-            ->has('generations', 1)
+            ->has('generations', 2)
             ->where('generations.0.id', $generation->id)
             ->where('generations.0.status', 'succeeded')
             ->where('generations.0.charge.amount', '0.3818875000'));

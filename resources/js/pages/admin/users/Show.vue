@@ -18,6 +18,8 @@ defineProps<{
     memberships: {
         organization_id: number;
         organization: string;
+        credit_balance: Money;
+        credits_reserved: Money;
         roles: string[];
         permissions: string[];
         joined_at: string | null;
@@ -137,9 +139,23 @@ const statusStyles: Record<GenerationStatus, string> = {
                         Also: {{ membership.permissions.join(', ') }}
                     </p>
                 </div>
-                <span class="text-zinc-600">{{
-                    membership.roles.join(', ') || 'No role'
-                }}</span>
+                <div class="text-right">
+                    <span class="text-zinc-600">{{
+                        membership.roles.join(', ') || 'No role'
+                    }}</span>
+                    <span
+                        class="block text-xs text-zinc-500 tabular-nums"
+                        :title="`$${membership.credit_balance.amount}`"
+                    >
+                        {{ membership.credit_balance.formatted }}
+                        credits<template
+                            v-if="membership.credits_reserved.amount !== '0'"
+                        >
+                            · {{ membership.credits_reserved.formatted }} set
+                            aside</template
+                        >
+                    </span>
+                </div>
             </li>
         </ul>
 
