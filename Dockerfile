@@ -71,11 +71,9 @@ COPY --chown=www-data:www-data resources ./resources
 COPY --chown=www-data:www-data routes ./routes
 COPY --chown=www-data:www-data storage ./storage
 
-# Autoload and package discovery at build time. The SQLite database lives in storage/app (a volume shared
-# by the app, Horizon and the scheduler); an empty file is a valid database for the first migration.
+# Autoload and package discovery at build time.
 RUN composer dump-autoload --optimize --no-dev && \
     php artisan package:discover --ansi && \
-    mkdir -p storage/app/database && touch storage/app/database/database.sqlite && \
     chown -R www-data:www-data vendor public bootstrap/cache storage
 
 COPY --from=assets --chown=www-data:www-data /app/public/build ./public/build

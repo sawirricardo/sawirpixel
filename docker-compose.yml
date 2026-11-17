@@ -1,6 +1,6 @@
 # The app, Horizon and the scheduler run the same image with different commands, sharing one storage
-# volume (which holds the SQLite database) and Redis. Settings come from .env; the overrides below
-# point the containers at each other instead of at services on the host.
+# volume, Postgres and Redis. Settings come from .env; the overrides below point the containers at each
+# other instead of at services on the host.
 x-app: &app
   image: sawirstudio/sawirpixel:latest
   platform: linux/amd64
@@ -8,14 +8,21 @@ x-app: &app
   environment: &app-environment
     APP_ENV: production
     APP_DEBUG: "false"
-    DB_CONNECTION: sqlite
-    DB_DATABASE: /var/www/html/storage/app/database/database.sqlite
+    DB_CONNECTION: pgsql
+    DB_HOST: db
+    DB_PORT: "5432"
+    DB_DATABASE: sawirpixel
+    DB_USERNAME: sawirpixel
+    DB_PASSWORD: sawirpixel
     REDIS_HOST: redis
     QUEUE_CONNECTION: redis
   volumes:
     - storage:/var/www/html/storage/app
   depends_on:
-    - redis
+    db:
+      condition: service_healthy
+    redis:
+      condition: service_started
 
 services:
   app:
@@ -68,6 +75,20 @@ services:
       test: ["CMD", "healthcheck-schedule"]
       start_period: 10s
 
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: sawirpixel
+      POSTGRES_USER: sawirpixel
+      POSTGRES_PASSWORD: sawirpixel
+    volumes:
+      - db:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sawirpixel -d sawirpixel"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   redis:
     image: redis:8-alpine
     command: ["redis-server", "--appendonly", "yes"]
@@ -76,4 +97,5 @@ services:
 
 volumes:
   storage:
+  db:
   redis:

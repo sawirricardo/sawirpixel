@@ -29,10 +29,16 @@ and Pest.
 
 ### 1. Run it in about 5 minutes
 
-You need PHP 8.5, Composer, pnpm and Redis. `docker run -d -p 6379:6379 redis` gives you Redis.
+You need PHP 8.5, Composer, pnpm, Redis and Postgres 18. The app needs Postgres because Postgres sums
+money columns exactly, and SQLite would sum them as floats. Docker can run both.
 
 ```bash
-composer setup                  # install, .env, app key, SQLite database, migrations, front-end build
+docker run -d -p 6379:6379 redis
+docker run -d -p 5432:5432 -e POSTGRES_HOST_AUTH_METHOD=trust postgres:18-alpine
+createdb -h 127.0.0.1 -U postgres sawirpixel       # the app's database
+createdb -h 127.0.0.1 -U postgres sawirpixel_test  # the test database
+
+composer setup                  # install, .env, app key, migrations, front-end build
 php artisan db:seed             # permissions, and test@example.com / password (verified)
 ```
 
@@ -62,11 +68,10 @@ Pixelforge's dashboard.
 
 #### Or with Docker
 
-`docker-compose.yml` runs the app, Horizon and the scheduler (`task`) from one image, plus Redis. The
-image is `sawirstudio/sawirpixel:latest` for `linux/amd64`, built on
+`docker-compose.yml` runs the app, Horizon and the scheduler (`task`) from one image, plus Postgres and
+Redis. The image is `sawirstudio/sawirpixel:latest` for `linux/amd64`, built on
 `serversideup/php:8.5-fpm-nginx-alpine`. Settings come from `.env`. The compose file points the
-containers at Redis and keeps the SQLite database in a shared volume. The app container runs the
-migrations when it starts.
+containers at its own Postgres and Redis. The app container runs the migrations when it starts.
 
 ```bash
 docker compose up -d --build   # then open http://localhost:8080
@@ -128,9 +133,10 @@ Pixelforge's test directives make each scenario predictable. Put one at the star
   prices it, and adds the markup. `PIXELFORGE_MARKUP` sets the markup and defaults to `1.25`. The code
   is in `app/Services/Pricing/GenerationCostEstimator.php`.
 - The final charge uses the usage and rates Pixelforge reports for that generation, so it's exact.
-- All money is `brick/math` `BigDecimal`. Provider costs keep 9 decimal places, as Pixelforge reports
-  them, and charges keep 10. Money is never a float and never computed in SQL, where SQLite would use
-  floats. The app rounds it only for display.
+- All money is exact decimal. Provider costs keep 9 decimal places, as Pixelforge reports them, and
+  charges keep 10. Per-generation maths (estimate, markup, rounding) uses `brick/math` `BigDecimal` in
+  PHP. Totals (the profit report, spend, limits, credits set aside) are `SUM()` over Postgres
+  `numeric` columns, which is exact. Money is never a float, and the app rounds it only for display.
 
 ### Asynchronous generations
 
@@ -238,7 +244,7 @@ Each lifecycle that drives behaviour is explicit, with its diagram in a docblock
 ## Tests and quality gates
 
 ```bash
-php artisan test --compact      # 441 tests, on SQLite; all pass on Postgres too
+php artisan test --compact      # 444 tests, on Postgres (the sawirpixel_test database)
 composer test                   # everything below, then the suite
 composer test:types             # PHPStan (Larastan, level max)
 composer test:type-coverage     # 100% type coverage
