@@ -17,7 +17,10 @@ use App\Http\Controllers\InvitationAcceptanceController;
 use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\MemberController;
 use App\Http\Controllers\OrganizationController;
+use App\Http\Controllers\OrganizationSettingsController;
 use App\Http\Controllers\PixelforgeWebhookController;
+use App\Http\Controllers\Settings\PasswordController;
+use App\Http\Controllers\Settings\ProfileController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', HomeController::class)->name('home');
@@ -43,6 +46,10 @@ Route::middleware('guest')->group(function (): void {
 Route::middleware('auth')->group(function (): void {
     Route::post('/logout', [LoginController::class, 'destroy'])->name('logout');
 
+    Route::get('/settings/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::patch('/settings/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::put('/settings/password', [PasswordController::class, 'update'])->middleware('throttle:6,1')->name('password.update');
+
     Route::get('/credits', [CreditController::class, 'index'])->name('credits.index');
     Route::post('/credits/purchases', CreditPurchaseController::class)->middleware('throttle:20,1')->name('credits.purchase');
 
@@ -50,7 +57,9 @@ Route::middleware('auth')->group(function (): void {
     Route::post('/organizations', [OrganizationController::class, 'store'])->name('organizations.store');
     Route::put('/organizations/{organization}/current', [CurrentOrganizationController::class, 'update'])->name('organizations.switch');
 
-    Route::get('/organization/members', [MemberController::class, 'index'])->name('members.index');
+    Route::get('/organization/settings', [OrganizationSettingsController::class, 'edit'])->name('organization.settings');
+    Route::patch('/organization/settings', [OrganizationSettingsController::class, 'update'])->name('organization.update');
+    Route::redirect('/organization/members', '/organization/settings')->name('members.index');
     Route::patch('/organization/members/{member}', [MemberController::class, 'update'])->name('members.update');
     Route::delete('/organization/members/{member}', [MemberController::class, 'destroy'])->name('members.destroy');
 

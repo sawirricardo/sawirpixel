@@ -156,9 +156,13 @@ const success = computed(() => {
                                 :organizations="auth.organizations"
                                 :can-view-members="auth.canViewMembers"
                             />
-                            <span class="font-medium">{{
-                                auth.user.name
-                            }}</span>
+                            <Link
+                                href="/settings/profile"
+                                class="font-medium hover:underline"
+                                title="Your profile"
+                            >
+                                {{ auth.user.name }}
+                            </Link>
                             <Link
                                 href="/logout"
                                 method="post"

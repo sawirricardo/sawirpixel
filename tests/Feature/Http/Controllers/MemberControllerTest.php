@@ -24,10 +24,10 @@ describe('index', function (): void {
         OrgInvitation::factory()->for($organization)->create(['email' => 'pending@example.com']);
         OrgInvitation::factory()->for($organization)->expired()->create();
 
-        $response = $this->actingAs($owner)->get(route('members.index'));
+        $response = $this->actingAs($owner)->get(route('organization.settings'));
 
         $response->assertOk()->assertInertia(fn (Assert $page): Assert => $page
-            ->component('organizations/Members')
+            ->component('organizations/Settings')
             ->has('members', 2)
             ->where('members.0.email', $owner->email)
             ->where('members.0.roles', ['Owner'])
@@ -48,7 +48,7 @@ describe('index', function (): void {
         OrgInvitation::factory()->for($organization)->create();
         $member = addMember($organization, DefaultRole::Member);
 
-        $response = $this->actingAs($member)->get(route('members.index'));
+        $response = $this->actingAs($member)->get(route('organization.settings'));
 
         $response->assertInertia(fn (Assert $page): Assert => $page
             ->has('members', 2)
@@ -61,7 +61,7 @@ describe('index', function (): void {
         $organization = organizationOwner()->currentOrganization;
         $admin = addMember($organization, DefaultRole::Admin);
 
-        $response = $this->actingAs($admin)->get(route('members.index'));
+        $response = $this->actingAs($admin)->get(route('organization.settings'));
 
         $response->assertInertia(fn (Assert $page): Assert => $page
             ->where('grantable.roles', fn ($roles): bool => collect($roles)->pluck('name')->all() === ['Admin', 'Member'])
@@ -69,7 +69,7 @@ describe('index', function (): void {
     });
 
     test('asks a user without an organization to create one first', function (): void {
-        $this->actingAs(User::factory()->create())->get(route('members.index'))->assertRedirect(route('organizations.create'));
+        $this->actingAs(User::factory()->create())->get(route('organization.settings'))->assertRedirect(route('organizations.create'));
     });
 
     test('forbids a membership without any role', function (): void {
@@ -77,7 +77,7 @@ describe('index', function (): void {
         $membership = OrgUser::factory()->for($user)->create();
         $user->currentOrganization()->associate($membership->organization_id)->save();
 
-        $this->actingAs($user)->get(route('members.index'))->assertForbidden();
+        $this->actingAs($user)->get(route('organization.settings'))->assertForbidden();
     });
 });
 

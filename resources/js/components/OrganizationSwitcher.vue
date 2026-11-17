@@ -81,12 +81,12 @@ onBeforeUnmount(() =>
             <div class="my-1 border-t border-zinc-100" />
             <Link
                 v-if="canViewMembers"
-                href="/organization/members"
+                href="/organization/settings"
                 role="menuitem"
                 class="block rounded-lg px-3 py-2 hover:bg-zinc-100"
                 @click="open = false"
             >
-                Members
+                Settings &amp; members
             </Link>
             <Link
                 href="/credits"

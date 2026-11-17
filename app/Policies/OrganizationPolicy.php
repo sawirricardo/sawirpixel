@@ -14,6 +14,11 @@ use App\Models\User;
  */
 final class OrganizationPolicy
 {
+    public function update(User $user, Organization $organization): bool
+    {
+        return $this->allows($user, $organization, Permission::UpdateOrganization);
+    }
+
     public function viewMembers(User $user, Organization $organization): bool
     {
         return $this->allows($user, $organization, Permission::ViewMembers);
