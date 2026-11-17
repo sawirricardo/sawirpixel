@@ -10,6 +10,7 @@ use App\Jobs\SubmitGeneration;
 use App\Models\Generation;
 use App\Models\User;
 use App\Services\Billing\CreditLedger;
+use App\Services\Generations\GenerationThread;
 use App\Services\Pricing\GenerationCostEstimator;
 use App\Services\Pricing\Money;
 use Brick\Math\BigDecimal;
@@ -48,8 +49,9 @@ final class GenerationController
     }
 
     /**
-     * One generation, for its own page. Only the user who made it can see it, and only while working in
-     * that generation's organization; anything else is reported as missing.
+     * A generation on its thread page: the path from the thread's first prompt to this version, with
+     * each version's branches. Only the user who made it can see it, and only while working in its
+     * organization; anything else is reported as missing.
      */
     public function show(#[CurrentUser] User $user, string $generation): Response
     {
@@ -58,8 +60,23 @@ final class GenerationController
             ->where('organization_id', $user->current_organization_id)
             ->findOrFail($generation);
 
+        $thread = new GenerationThread(
+            Generation::query()
+                ->whereBelongsTo($user)
+                ->where('thread_id', $generation->thread_id)
+                ->oldest('id')
+                ->get(),
+        );
+
         return Inertia::render('generations/Show', [
             'generation' => $this->present($generation),
+            'thread' => array_map(fn (Generation $version): array => [
+                ...$this->present($version),
+                'parent_id' => $version->parent_id,
+                'can_continue' => $version->canBeContinued(),
+                'branches' => $thread->branchesAt($version),
+            ], $thread->pathTo($generation)),
+            'latestFollowUpId' => $thread->tipOf($generation)->id === $generation->id ? null : $thread->tipOf($generation)->id,
         ]);
     }
 
@@ -73,16 +90,23 @@ final class GenerationController
 
         Gate::authorize('create', [Generation::class, $organization]);
 
+        $parent = $this->continuableParent($request->parentId(), $user);
+
+        // A follow-up sends the version it continues from as its first reference image.
+        $referenceImages = $parent instanceof Generation && $parent->image_url !== null
+            ? [$parent->image_url, ...$request->referenceImages()]
+            : $request->referenceImages();
+
         $estimate = $estimator->estimate(
             $request->prompt(),
             $request->size(),
             $request->quality(),
-            count($request->referenceImages()),
+            count($referenceImages),
         );
 
         // Reserve the most it can cost. The estimate is worked out first: it may fetch pricing over HTTP,
         // which shouldn't happen while the user's row is locked.
-        $generation = DB::transaction(function () use ($request, $user, $organization, $estimate, $ledger): Generation {
+        $generation = DB::transaction(function () use ($request, $user, $organization, $estimate, $ledger, $parent, $referenceImages): Generation {
             $lockedOrganization = $ledger->lockOrganization($organization->id);
             $balance = BigDecimal::of($lockedOrganization->credit_balance);
 
@@ -103,10 +127,16 @@ final class GenerationController
                 'prompt' => $request->prompt(),
                 'size' => $request->size(),
                 'quality' => $request->quality(),
-                'reference_images' => $request->referenceImages(),
+                'reference_images' => $referenceImages,
+                'parent_id' => $parent?->id,
+                'thread_id' => $parent?->thread_id,
                 'estimated_charge_min' => (string) $estimate->chargeMin,
                 'estimated_charge_max' => (string) $estimate->chargeMax,
             ]);
+
+            if ($generation->thread_id === null) {
+                $generation->update(['thread_id' => $generation->id]);
+            }
 
             $ledger->hold($lockedOrganization, $generation, $estimate->chargeMax);
 
@@ -140,5 +170,35 @@ final class GenerationController
             'created_at' => $generation->created_at?->toIso8601String(),
             'completed_at' => $generation->completed_at?->toIso8601String(),
         ];
+    }
+
+    /**
+     * The version a follow-up continues from: the user's own, in their current organization, finished,
+     * and with an image link that hasn't expired yet.
+     *
+     * @throws ValidationException
+     */
+    private function continuableParent(?int $parentId, User $user): ?Generation
+    {
+        if ($parentId === null) {
+            return null;
+        }
+
+        $parent = Generation::query()
+            ->whereBelongsTo($user)
+            ->where('organization_id', $user->current_organization_id)
+            ->find($parentId);
+
+        if (! $parent instanceof Generation) {
+            throw ValidationException::withMessages(['parent_id' => 'That version could not be found.']);
+        }
+
+        if (! $parent->canBeContinued()) {
+            throw ValidationException::withMessages(['parent_id' => $parent->status === GenerationStatus::Succeeded
+                ? "That version's image link has expired, so it can't be continued. Start a new image instead."
+                : 'You can only continue from a finished image.']);
+        }
+
+        return $parent;
     }
 }

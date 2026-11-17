@@ -131,6 +131,13 @@ function isActive(id: number): boolean {
                             <span class="truncate">{{
                                 generation.prompt
                             }}</span>
+                            <span
+                                v-if="generation.versions > 1"
+                                class="ml-auto shrink-0 rounded-full bg-zinc-200 px-1.5 text-[10px] font-medium text-zinc-600 tabular-nums"
+                                :title="`${generation.versions} versions`"
+                            >
+                                {{ generation.versions }}
+                            </span>
                         </Link>
                     </li>
                 </ul>

@@ -7,10 +7,15 @@ export type PillOption<V extends string> = {
     hint?: string;
 };
 
-const props = defineProps<{
-    label: string;
-    options: PillOption<T>[];
-}>();
+const props = withDefaults(
+    defineProps<{
+        label: string;
+        options: PillOption<T>[];
+        /** Open above the button, e.g. in a composer pinned to the bottom of the screen. */
+        openUp?: boolean;
+    }>(),
+    { openUp: false },
+);
 
 const model = defineModel<T>({ required: true });
 
@@ -66,7 +71,8 @@ const selected = () =>
             v-if="open"
             role="listbox"
             :aria-label="label"
-            class="absolute top-full left-0 z-20 mt-2 min-w-44 overflow-hidden rounded-xl border border-zinc-200 bg-white p-1 shadow-lg"
+            :class="openUp ? 'bottom-full mb-2' : 'top-full mt-2'"
+            class="absolute left-0 z-20 min-w-44 overflow-hidden rounded-xl border border-zinc-200 bg-white p-1 shadow-lg"
         >
             <li
                 class="px-3 pt-1.5 pb-1 text-xs font-medium tracking-wide text-zinc-400 uppercase"

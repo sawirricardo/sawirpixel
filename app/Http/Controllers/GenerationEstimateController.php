@@ -24,7 +24,8 @@ final class GenerationEstimateController
             $request->prompt(),
             $request->size(),
             $request->quality(),
-            count($request->referenceImages()),
+            // A follow-up's parent image is sent as one more reference.
+            count($request->referenceImages()) + ($request->parentId() === null ? 0 : 1),
         );
 
         return response()->json([

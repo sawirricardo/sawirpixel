@@ -27,7 +27,9 @@ trait ValidatesGenerationInput
             'prompt' => [$promptRequired ? 'required' : 'nullable', 'string', 'max:'.self::MAX_PROMPT_LENGTH],
             'size' => ['required', Rule::enum(ImageSize::class)],
             'quality' => ['required', Rule::enum(ImageQuality::class)],
-            'reference_images' => ['array', 'max:'.self::MAX_REFERENCE_IMAGES],
+            'parent_id' => ['nullable', 'integer'],
+            // A follow-up's parent image takes one of Pixelforge's reference slots.
+            'reference_images' => ['array', 'max:'.(self::MAX_REFERENCE_IMAGES - ($this->filled('parent_id') ? 1 : 0))],
             'reference_images.*' => ['required', 'string', 'distinct', 'url:http,https', 'max:2048'],
         ];
     }
@@ -55,6 +57,11 @@ trait ValidatesGenerationInput
     public function quality(): ImageQuality
     {
         return $this->enum('quality', ImageQuality::class) ?? ImageQuality::Medium;
+    }
+
+    public function parentId(): ?int
+    {
+        return $this->filled('parent_id') ? $this->integer('parent_id') : null;
     }
 
     /**

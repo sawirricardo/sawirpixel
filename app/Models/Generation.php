@@ -17,6 +17,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property-read int $id
  * @property int $organization_id
  * @property int $user_id
+ * @property int|null $parent_id The version this one continues from.
+ * @property int|null $thread_id The id of the thread's first generation.
  * @property GenerationStatus $status
  * @property string|null $pixelforge_id
  * @property string $idempotency_key
@@ -66,6 +68,16 @@ final class Generation extends Model
     {
         // Generations outlive a deleted organization as billing records.
         return $this->belongsTo(Organization::class)->withTrashed();
+    }
+
+    /**
+     * Whether its image can still be used to continue from: Pixelforge's links expire after a day.
+     */
+    public function canBeContinued(): bool
+    {
+        return $this->status === GenerationStatus::Succeeded
+            && $this->image_url !== null
+            && ($this->image_url_expires_at === null || $this->image_url_expires_at->isFuture());
     }
 
     /**

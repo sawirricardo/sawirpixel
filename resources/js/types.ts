@@ -10,8 +10,14 @@ export type RecentGeneration = {
     id: number;
     prompt: string;
     status: GenerationStatus;
-    image_url: string | null;
+    versions: number;
     created_at: string | null;
+};
+
+export type ThreadVersion = GenerationItem & {
+    parent_id: number | null;
+    can_continue: boolean;
+    branches: { position: number; total: number; tips: number[] };
 };
 
 export type SharedProps = {

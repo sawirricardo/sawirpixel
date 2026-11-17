@@ -41,6 +41,46 @@ final class GenerationFactory extends Factory
     }
 
     /**
+     * A generation without a parent starts its own thread.
+     */
+    public function configure(): static
+    {
+        return $this->afterCreating(function (Generation $generation): void {
+            if ($generation->thread_id === null) {
+                $generation->update(['thread_id' => $generation->id]);
+            }
+        });
+    }
+
+    /**
+     * A finished generation whose image can still be continued from.
+     */
+    public function succeeded(): static
+    {
+        return $this->queued()->state(fn (): array => [
+            'status' => GenerationStatus::Succeeded,
+            'image_url' => 'https://pixelforge.promptedit.dev/images/'.Str::random(10).'.png?signature=abc',
+            'image_url_expires_at' => now()->addDay(),
+            'charge' => '0.3818875000',
+            'provider_cost' => '0.305510000',
+            'completed_at' => now(),
+        ]);
+    }
+
+    /**
+     * A follow-up that continues from the given version, in its thread.
+     */
+    public function continuing(Generation $parent): static
+    {
+        return $this->state(fn (): array => [
+            'parent_id' => $parent->id,
+            'thread_id' => $parent->thread_id,
+            'organization_id' => $parent->organization_id,
+            'user_id' => $parent->user_id,
+        ]);
+    }
+
+    /**
      * Indicate that Pixelforge has accepted the generation.
      */
     public function queued(): static
