@@ -9,6 +9,7 @@ use App\Models\Generation;
 use App\Models\Organization;
 use App\Services\Billing\CreditLedger;
 use Brick\Math\BigDecimal;
+use Illuminate\Support\Facades\DB;
 
 function heldGeneration(Organization $organization, string $hold): Generation
 {
@@ -86,7 +87,8 @@ test('refuses to hold the same generation twice', function (): void {
     $generation = heldGeneration($organization, '0.4');
     $ledger = resolve(CreditLedger::class);
 
-    expect(fn () => $ledger->hold($ledger->lockOrganization($organization->id), $generation, BigDecimal::of('0.4')))
+    // As in the app: holding happens inside a transaction, which a conflict rolls back.
+    expect(fn () => DB::transaction(fn () => $ledger->hold($ledger->lockOrganization($organization->id), $generation, BigDecimal::of('0.4'))))
         ->toThrow(CreditLedgerConflictException::class);
     expect($organization->refresh()->credit_balance)->toBe('0.6000000000');
 });
