@@ -51,6 +51,7 @@ const { start, stop } = usePoll(
             'versions',
             'branchCount',
             'recentGenerations',
+            'notifications',
             'auth',
         ],
     },

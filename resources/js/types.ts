@@ -32,9 +32,19 @@ export type ThreadVersion = GenerationItem & {
     branches: { position: number; total: number; tips: number[] };
 };
 
+export type AppNotification = {
+    id: string;
+    kind: 'generation_finished' | 'invitation' | 'low_credits' | string;
+    title: string;
+    body: string;
+    read: boolean;
+    created_at: string | null;
+};
+
 export type SharedProps = {
     name: string;
     recentGenerations: RecentGeneration[];
+    notifications: { unread: number; recent: AppNotification[] } | null;
     auth: {
         user: AuthUser | null;
         organization: { id: number; name: string } | null;

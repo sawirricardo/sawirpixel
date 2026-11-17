@@ -10,6 +10,7 @@ use App\Models\OrgInvitation;
 use App\Models\OrgUser;
 use App\Models\Permission;
 use App\Models\User;
+use App\Notifications\InvitedToOrganization;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -43,6 +44,10 @@ final readonly class AcceptInvitation
             }
 
             $invitation->update(['accepted_at' => now()]);
+            $user->unreadNotifications()
+                ->where('data->kind', InvitedToOrganization::KIND)
+                ->where('data->invitation_id', $invitation->id)
+                ->update(['read_at' => now()]);
             $user->currentOrganization()->associate($organization)->save();
 
             return $organization;

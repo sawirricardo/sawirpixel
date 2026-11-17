@@ -23,6 +23,8 @@ use Illuminate\Support\Facades\DB;
  */
 final readonly class CreditLedger
 {
+    public function __construct(private LowBalanceAlert $lowBalanceAlert) {}
+
     /**
      * Add purchased credits. Replaying the same purchase key returns the original purchase: the unique
      * (organization, purchase key) index rejects the second insert, rather than a check-then-insert that
@@ -75,7 +77,9 @@ final readonly class CreditLedger
             }
 
             if ($charge instanceof BigDecimal && ! $entries->has(CreditTransactionType::Charge->value)) {
+                $before = BigDecimal::of($organization->credit_balance);
                 $this->record($organization, CreditTransactionType::Charge, $charge->negated(), $generation->user_id, $generation->id);
+                $this->lowBalanceAlert->afterCharge($organization, $before, BigDecimal::of($organization->credit_balance));
             }
         });
     }

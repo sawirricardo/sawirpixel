@@ -9,6 +9,7 @@ use App\Http\Requests\StoreGenerationRequest;
 use App\Jobs\SubmitGeneration;
 use App\Models\Generation;
 use App\Models\User;
+use App\Notifications\GenerationFinished;
 use App\Services\Billing\CreditLedger;
 use App\Services\Generations\GenerationThread;
 use App\Services\Pricing\GenerationCostEstimator;
@@ -59,6 +60,12 @@ final class GenerationController
             ->whereBelongsTo($user)
             ->where('organization_id', $user->current_organization_id)
             ->findOrFail($generation);
+
+        // Seeing the result is reading its "your image is ready" notification.
+        $user->unreadNotifications()
+            ->where('data->kind', GenerationFinished::KIND)
+            ->where('data->generation_id', $generation->id)
+            ->update(['read_at' => now()]);
 
         $thread = new GenerationThread(
             Generation::query()

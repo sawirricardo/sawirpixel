@@ -7,6 +7,7 @@ namespace App\Actions;
 use App\Enums\GenerationStatus;
 use App\Enums\Pixelforge\GenerationStatus as PixelforgeStatus;
 use App\Models\Generation;
+use App\Notifications\GenerationFinished;
 use App\Services\Billing\CreditLedger;
 use App\Services\Generations\FailureMessage;
 use App\Services\Pixelforge\Data\Generation as PixelforgeGeneration;
@@ -56,6 +57,11 @@ final readonly class ApplyPixelforgeGeneration
             }
 
             $locked->save();
+
+            if ($this->isFinal($locked->status)) {
+                // Only the snapshot that finishes the generation gets here, so this is sent once.
+                DB::afterCommit(fn () => $locked->user?->notify(new GenerationFinished($locked)));
+            }
 
             return $locked;
         });

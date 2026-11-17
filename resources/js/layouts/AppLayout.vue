@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { Link, router, usePage } from '@inertiajs/vue3';
+import { Link, router, usePage, usePoll } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
 import AccessDialog from '@/components/AccessDialog.vue';
 import BuyCreditsDialog from '@/components/BuyCreditsDialog.vue';
 import HistorySidebar from '@/components/HistorySidebar.vue';
+import NotificationBell from '@/components/NotificationBell.vue';
 import OrganizationSwitcher from '@/components/OrganizationSwitcher.vue';
 import { useAccessDialog } from '@/lib/accessDialog';
 import { useCreditsDialog } from '@/lib/creditsDialog';
@@ -11,6 +12,23 @@ import type { SharedProps } from '@/types';
 
 const page = usePage<SharedProps>();
 const auth = computed(() => page.props.auth);
+
+/**
+ * Picks up finished images, invitations and low-credit alerts on whatever page is open. Inertia slows
+ * this down while the tab is in the background.
+ */
+const notificationsPoll = usePoll(
+    30000,
+    { only: ['notifications', 'recentGenerations'] },
+    { autoStart: false },
+);
+
+watch(
+    () => auth.value.user !== null,
+    (loggedIn) =>
+        loggedIn ? notificationsPoll.start() : notificationsPoll.stop(),
+    { immediate: true },
+);
 const access = useAccessDialog();
 const creditsDialog = useCreditsDialog();
 
@@ -150,6 +168,10 @@ const success = computed(() => {
                                 >
                                 <span class="sr-only">credits</span>
                             </button>
+                            <NotificationBell
+                                v-if="page.props.notifications"
+                                :notifications="page.props.notifications"
+                            />
                             <OrganizationSwitcher
                                 v-if="auth.organization"
                                 :current="auth.organization"

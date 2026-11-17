@@ -12,6 +12,7 @@ use App\Services\Billing\CreditLedger;
 use App\Services\Pricing\Money;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Http\Request;
+use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Inertia\Middleware;
@@ -19,6 +20,8 @@ use Inertia\Middleware;
 final class HandleInertiaRequests extends Middleware
 {
     public const int SIDEBAR_GENERATIONS = 30;
+
+    public const int RECENT_NOTIFICATIONS = 8;
 
     /**
      * The root template that's loaded on the first page visit.
@@ -40,6 +43,7 @@ final class HandleInertiaRequests extends Middleware
             ...parent::share($request),
             'name' => config('app.name'),
             'recentGenerations' => fn (): array => $this->recentGenerations($user),
+            'notifications' => fn (): ?array => $user instanceof User ? $this->notifications($user) : null,
             'auth' => [
                 'user' => $user instanceof User ? [
                     'id' => $user->id,
@@ -70,6 +74,32 @@ final class HandleInertiaRequests extends Middleware
                 'canViewMembers' => fn (): bool => $user instanceof User && $user->currentOrganization !== null
                     && Gate::forUser($user)->allows('viewMembers', $user->currentOrganization),
             ],
+        ];
+    }
+
+    /**
+     * The bell in the header: how many are unread and the latest few.
+     *
+     * @return array{unread: int, recent: list<array{id: string, kind: string, title: string, body: string, read: bool, created_at: string|null}>}
+     */
+    private function notifications(User $user): array
+    {
+        $text = fn (mixed $value): string => is_string($value) ? $value : '';
+
+        return [
+            'unread' => $user->unreadNotifications()->count(),
+            'recent' => array_values($user->notifications()
+                ->limit(self::RECENT_NOTIFICATIONS)
+                ->get()
+                ->map(fn (DatabaseNotification $notification): array => [
+                    'id' => $notification->id,
+                    'kind' => $text($notification->data['kind'] ?? null),
+                    'title' => $text($notification->data['title'] ?? null),
+                    'body' => $text($notification->data['body'] ?? null),
+                    'read' => $notification->read_at !== null,
+                    'created_at' => $notification->created_at?->toIso8601String(),
+                ])
+                ->all()),
         ];
     }
 

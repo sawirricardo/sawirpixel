@@ -10,6 +10,7 @@ use App\Models\Organization;
 use App\Models\OrgInvitation;
 use App\Models\Role;
 use App\Models\User;
+use App\Notifications\InvitedToOrganization;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
@@ -46,6 +47,7 @@ final readonly class InviteMember
         });
 
         Mail::to($email)->queue(new OrgInvitationMail($invitation, $token));
+        $this->notifyExistingAccount($invitation);
 
         return $invitation;
     }
@@ -63,7 +65,29 @@ final readonly class InviteMember
         ]);
 
         Mail::to($invitation->email)->queue(new OrgInvitationMail($invitation, $token));
+        $this->notifyExistingAccount($invitation);
 
         return $invitation;
+    }
+
+    /**
+     * Someone who already has an account also sees the invitation in the app, once per invitation.
+     */
+    private function notifyExistingAccount(OrgInvitation $invitation): void
+    {
+        $invitee = User::query()->where('email', $invitation->email)->first();
+
+        if (! $invitee instanceof User) {
+            return;
+        }
+
+        $alreadyNotified = $invitee->unreadNotifications()
+            ->where('data->kind', InvitedToOrganization::KIND)
+            ->where('data->invitation_id', $invitation->id)
+            ->exists();
+
+        if (! $alreadyNotified) {
+            $invitee->notify(new InvitedToOrganization($invitation->load(['organization:id,name', 'invitedBy:id,name', 'roles:id,name'])));
+        }
     }
 }

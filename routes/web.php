@@ -21,10 +21,13 @@ use App\Http\Controllers\GenerationImageController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\InvitationAcceptanceController;
 use App\Http\Controllers\InvitationController;
+use App\Http\Controllers\MarkNotificationsReadController;
 use App\Http\Controllers\MemberController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OrganizationController;
 use App\Http\Controllers\OrganizationSettingsController;
 use App\Http\Controllers\PixelforgeWebhookController;
+use App\Http\Controllers\ReceivedInvitationController;
 use App\Http\Controllers\RobotsController;
 use App\Http\Controllers\Settings\PasswordController;
 use App\Http\Controllers\Settings\ProfileController;
@@ -60,6 +63,12 @@ Route::middleware('guest')->group(function (): void {
 });
 
 Route::middleware(['auth', NoIndex::class])->group(function (): void {
+    Route::get('/notifications/{notification}', [NotificationController::class, 'show'])->name('notifications.show');
+    Route::post('/notifications/read', MarkNotificationsReadController::class)->name('notifications.read');
+    Route::get('/invitations/received/{invitation}', [ReceivedInvitationController::class, 'show'])->name('invitations.received');
+    Route::post('/invitations/received/{invitation}', [ReceivedInvitationController::class, 'store'])
+        ->middleware(['verified', 'throttle:10,1'])
+        ->name('invitations.received.accept');
     Route::post('/logout', [LoginController::class, 'destroy'])->name('logout');
 
     Route::get('/email/verify', EmailVerificationNoticeController::class)->name('verification.notice');

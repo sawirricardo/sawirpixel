@@ -6,8 +6,8 @@ namespace App\Http\Controllers;
 
 use App\Actions\AcceptInvitation;
 use App\Models\OrgInvitation;
-use App\Models\Permission;
 use App\Models\User;
+use App\Services\Invitations\InvitationPage;
 use Illuminate\Container\Attributes\CurrentUser;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
@@ -27,19 +27,7 @@ final class InvitationAcceptanceController
             redirect()->setIntendedUrl(route('invitations.show', $token));
         }
 
-        return Inertia::render('invitations/Show', [
-            'token' => $token,
-            'invitation' => $invitation instanceof OrgInvitation ? [
-                'email' => $invitation->email,
-                'organization' => $invitation->organization->name ?? '',
-                'roles' => $invitation->roles->pluck('name')->all(),
-                'permissions' => $invitation->permissions->map(fn (Permission $permission): string => $permission->name->label())->all(),
-                'inviter' => $invitation->invitedBy?->name,
-                'is_pending' => $invitation->isPending(),
-            ] : null,
-            'emailMatches' => $user instanceof User && $invitation instanceof OrgInvitation
-                && mb_strtolower($user->email) === mb_strtolower($invitation->email),
-        ]);
+        return Inertia::render('invitations/Show', InvitationPage::props($invitation, $user, route('invitations.accept', $token, absolute: false)));
     }
 
     public function store(string $token, #[CurrentUser] User $user, AcceptInvitation $acceptInvitation): RedirectResponse

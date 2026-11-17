@@ -7,6 +7,7 @@ namespace App\Jobs;
 use App\Enums\GenerationStatus;
 use App\Exceptions\Pixelforge\PixelforgeException;
 use App\Models\Generation;
+use App\Notifications\GenerationFinished;
 use App\Services\Billing\CreditLedger;
 use App\Services\Generations\FailureMessage;
 use App\Services\Pixelforge\Data\GenerationRequest;
@@ -172,7 +173,9 @@ final class SubmitGeneration implements ShouldBeUnique, ShouldQueue
             ]);
 
             if ($updated === 1) {
-                resolve(CreditLedger::class)->settle(Generation::query()->findOrFail($this->generation->id), null);
+                $generation = Generation::query()->findOrFail($this->generation->id);
+                resolve(CreditLedger::class)->settle($generation, null);
+                DB::afterCommit(fn () => $generation->user?->notify(new GenerationFinished($generation)));
             }
         });
     }

@@ -6,7 +6,7 @@ import { useAccessDialog } from '@/lib/accessDialog';
 import type { SharedProps } from '@/types';
 
 const props = defineProps<{
-    token: string;
+    acceptUrl: string;
     invitation: {
         email: string;
         organization: string;
@@ -25,7 +25,7 @@ const user = computed(() => page.props.auth.user);
 const form = useForm({});
 
 function accept(): void {
-    form.post(`/invitations/${props.token}`);
+    form.post(props.acceptUrl);
 }
 
 const errors = computed(
