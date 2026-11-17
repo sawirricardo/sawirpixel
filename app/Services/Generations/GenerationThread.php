@@ -93,4 +93,36 @@ final readonly class GenerationThread
 
         return $current;
     }
+
+    /**
+     * Every version in the thread as an outline: depth-first from the first prompt, follow-ups oldest
+     * first, each with how deep it sits. Drawn as the thread's map of branches.
+     *
+     * @return list<array{generation: Generation, depth: int}>
+     */
+    public function outline(): array
+    {
+        $roots = array_values(array_filter($this->byId, fn (Generation $generation): bool => $generation->parent_id === null || ! isset($this->byId[$generation->parent_id])));
+        $outline = [];
+        $stack = array_map(fn (Generation $root): array => [$root, 0], array_reverse($roots));
+
+        while ($stack !== []) {
+            [$generation, $depth] = array_pop($stack);
+            $outline[] = ['generation' => $generation, 'depth' => $depth];
+
+            foreach (array_reverse($this->children[$generation->id] ?? []) as $child) {
+                $stack[] = [$child, $depth + 1];
+            }
+        }
+
+        return $outline;
+    }
+
+    /**
+     * How many branches the thread has: the number of versions nobody has continued from yet.
+     */
+    public function branchCount(): int
+    {
+        return count(array_filter($this->byId, fn (Generation $generation): bool => ($this->children[$generation->id] ?? []) === []));
+    }
 }

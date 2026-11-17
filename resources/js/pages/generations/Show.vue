@@ -21,12 +21,15 @@ import type {
     GenerationStatus,
     SharedProps,
     ThreadVersion,
+    VersionMapEntry,
 } from '@/types';
 
 const props = defineProps<{
     generation: GenerationItem;
     thread: ThreadVersion[];
     latestFollowUpId: number | null;
+    versions: VersionMapEntry[];
+    branchCount: number;
 }>();
 
 const page = usePage<SharedProps>();
@@ -45,6 +48,8 @@ const { start, stop } = usePoll(
             'generation',
             'thread',
             'latestFollowUpId',
+            'versions',
+            'branchCount',
             'recentGenerations',
             'auth',
         ],
@@ -55,6 +60,14 @@ const { start, stop } = usePoll(
 watch(running, (active) => (active ? start() : stop()), { immediate: true });
 
 const brokenImages = reactive(new Set<number>());
+
+const statusDot: Record<GenerationStatus, string> = {
+    pending: 'bg-zinc-400 animate-pulse',
+    queued: 'bg-sky-500 animate-pulse',
+    processing: 'bg-amber-500 animate-pulse',
+    succeeded: 'bg-emerald-500',
+    failed: 'bg-red-500',
+};
 
 const statusLabel: Record<GenerationStatus, string> = {
     pending: 'Waiting to be submitted…',
@@ -214,6 +227,80 @@ function versionNumber(version: ThreadVersion): number {
     <AppLayout>
         <Head :title="(thread[0]?.prompt ?? generation.prompt).slice(0, 40)" />
         <div class="mx-auto max-w-3xl pb-48">
+            <details
+                v-if="versions.length > 1"
+                class="mb-8 rounded-2xl border border-zinc-200 bg-white"
+                :open="branchCount > 1"
+            >
+                <summary
+                    class="cursor-pointer px-4 py-3 text-sm font-medium text-zinc-700 select-none"
+                >
+                    {{ versions.length }} versions<template
+                        v-if="branchCount > 1"
+                    >
+                        · {{ branchCount }} branches</template
+                    >
+                </summary>
+                <ol
+                    class="border-t border-zinc-100 px-2 py-2"
+                    aria-label="All versions in this thread"
+                >
+                    <li v-for="entry in versions" :key="entry.id">
+                        <Link
+                            :href="`/generations/${entry.id}`"
+                            preserve-scroll
+                            class="flex items-center gap-2 rounded-lg py-1 pr-2 text-sm hover:bg-zinc-100"
+                            :class="{
+                                'bg-zinc-100 font-medium text-zinc-900':
+                                    entry.is_current,
+                                'text-zinc-700':
+                                    entry.on_path && !entry.is_current,
+                                'text-zinc-500': !entry.on_path,
+                            }"
+                            :style="{
+                                paddingLeft: `${0.5 + entry.depth * 1.25}rem`,
+                            }"
+                            :aria-current="
+                                entry.is_current ? 'page' : undefined
+                            "
+                        >
+                            <span
+                                v-if="entry.depth > 0"
+                                class="text-zinc-300"
+                                aria-hidden="true"
+                                >└</span
+                            >
+                            <img
+                                v-if="
+                                    entry.image_url &&
+                                    !brokenImages.has(entry.id)
+                                "
+                                :src="entry.image_url"
+                                alt=""
+                                loading="lazy"
+                                class="size-8 shrink-0 rounded-md bg-zinc-100 object-cover"
+                                @error="brokenImages.add(entry.id)"
+                            />
+                            <span
+                                v-else
+                                class="size-8 shrink-0 rounded-md bg-zinc-100"
+                                aria-hidden="true"
+                            />
+                            <span
+                                class="size-2 shrink-0 rounded-full"
+                                :class="statusDot[entry.status]"
+                                :title="entry.status"
+                            />
+                            <span
+                                class="shrink-0 text-xs text-zinc-400 tabular-nums"
+                                >v{{ entry.number }}</span
+                            >
+                            <span class="truncate">{{ entry.prompt }}</span>
+                        </Link>
+                    </li>
+                </ol>
+            </details>
+
             <article v-for="version in thread" :key="version.id" class="mb-10">
                 <div
                     class="ml-auto w-fit max-w-[85%] rounded-3xl bg-zinc-200/70 px-5 py-3 text-sm whitespace-pre-wrap"

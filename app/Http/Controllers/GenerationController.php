@@ -77,6 +77,8 @@ final class GenerationController
                 'branches' => $thread->branchesAt($version),
             ], $thread->pathTo($generation)),
             'latestFollowUpId' => $thread->tipOf($generation)->id === $generation->id ? null : $thread->tipOf($generation)->id,
+            'versions' => $this->versionsMap($thread, $generation),
+            'branchCount' => $thread->branchCount(),
         ]);
     }
 
@@ -202,5 +204,32 @@ final class GenerationController
         }
 
         return $parent;
+    }
+
+    /**
+     * The thread's map: every version, indented by branch, marking the path to the one being viewed.
+     *
+     * @return list<array{id: int, number: int, depth: int, prompt: string, status: string, image_url: string|null, on_path: bool, is_current: bool}>
+     */
+    private function versionsMap(GenerationThread $thread, Generation $current): array
+    {
+        $onPath = array_map(fn (Generation $version): int => $version->id, $thread->pathTo($current));
+        $number = 0;
+
+        return array_map(function (array $entry) use ($onPath, $current, &$number): array {
+            $version = $entry['generation'];
+            $number++;
+
+            return [
+                'id' => $version->id,
+                'number' => $number,
+                'depth' => $entry['depth'],
+                'prompt' => Str::limit($version->prompt, 60),
+                'status' => $version->status->value,
+                'image_url' => $version->canBeContinued() ? route('generations.image', $version, absolute: false) : null,
+                'on_path' => in_array($version->id, $onPath, true),
+                'is_current' => $version->id === $current->id,
+            ];
+        }, $thread->outline());
     }
 }

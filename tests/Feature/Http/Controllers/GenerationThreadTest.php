@@ -128,6 +128,32 @@ describe('thread page', function (): void {
             ->where('latestFollowUpId', null));
     });
 
+    test('maps every version by branch, marking the path to the one being viewed', function (): void {
+        ['user' => $user, 'v1' => $v1, 'v2' => $v2, 'v3a' => $v3a, 'v3b' => $v3b] = branchedThread();
+
+        $response = $this->actingAs($user)->get(route('generations.show', $v3b));
+
+        $response->assertInertia(fn (Assert $page): Assert => $page
+            ->where('branchCount', 2)
+            ->where('versions', [
+                ['id' => $v1->id, 'number' => 1, 'depth' => 0, 'prompt' => 'A lighthouse', 'status' => 'succeeded', 'image_url' => '/generations/'.$v1->id.'/image', 'on_path' => true, 'is_current' => false],
+                ['id' => $v2->id, 'number' => 2, 'depth' => 1, 'prompt' => 'Stormier sky', 'status' => 'succeeded', 'image_url' => '/generations/'.$v2->id.'/image', 'on_path' => true, 'is_current' => false],
+                ['id' => $v3a->id, 'number' => 3, 'depth' => 2, 'prompt' => 'Add a ship', 'status' => 'succeeded', 'image_url' => '/generations/'.$v3a->id.'/image', 'on_path' => false, 'is_current' => false],
+                ['id' => $v3b->id, 'number' => 4, 'depth' => 2, 'prompt' => 'Make it night', 'status' => 'succeeded', 'image_url' => '/generations/'.$v3b->id.'/image', 'on_path' => true, 'is_current' => true],
+            ]));
+    });
+
+    test('leaves out thumbnails whose image link has expired', function (): void {
+        $user = organizationOwner();
+        $v1 = Generation::factory()->succeeded()->for($user)->for($user->currentOrganization)->create(['image_url_expires_at' => now()->subMinute()]);
+        $v2 = Generation::factory()->succeeded()->continuing($v1)->create();
+
+        $this->actingAs($user)->get(route('generations.show', $v2))->assertInertia(fn (Assert $page): Assert => $page
+            ->where('versions.0.image_url', null)
+            ->where('versions.1.image_url', '/generations/'.$v2->id.'/image')
+            ->where('branchCount', 1));
+    });
+
     test('points an earlier version to where its branch continues', function (): void {
         ['user' => $user, 'v2' => $v2, 'v3b' => $v3b] = branchedThread();
 
@@ -148,6 +174,8 @@ describe('thread page', function (): void {
             ->where('recentGenerations.0.versions', 1)
             ->where('recentGenerations.1.id', $v3b->id)
             ->where('recentGenerations.1.prompt', 'A lighthouse')
-            ->where('recentGenerations.1.versions', 4));
+            ->where('recentGenerations.1.versions', 4)
+            ->where('recentGenerations.1.branches', 2)
+            ->where('recentGenerations.0.branches', 1));
     });
 });

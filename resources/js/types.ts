@@ -11,7 +11,19 @@ export type RecentGeneration = {
     prompt: string;
     status: GenerationStatus;
     versions: number;
+    branches: number;
     created_at: string | null;
+};
+
+export type VersionMapEntry = {
+    id: number;
+    number: number;
+    depth: number;
+    prompt: string;
+    status: GenerationStatus;
+    image_url: string | null;
+    on_path: boolean;
+    is_current: boolean;
 };
 
 export type ThreadVersion = GenerationItem & {

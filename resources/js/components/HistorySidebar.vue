@@ -132,8 +132,16 @@ function isActive(id: number): boolean {
                                 generation.prompt
                             }}</span>
                             <span
+                                v-if="generation.branches > 1"
+                                class="ml-auto shrink-0 text-[10px] font-medium text-zinc-500 tabular-nums"
+                                :title="`${generation.branches} branches`"
+                                :aria-label="`${generation.branches} branches`"
+                                >⑂ {{ generation.branches }}</span
+                            >
+                            <span
                                 v-if="generation.versions > 1"
-                                class="ml-auto shrink-0 rounded-full bg-zinc-200 px-1.5 text-[10px] font-medium text-zinc-600 tabular-nums"
+                                class="shrink-0 rounded-full bg-zinc-200 px-1.5 text-[10px] font-medium text-zinc-600 tabular-nums"
+                                :class="{ 'ml-auto': generation.branches <= 1 }"
                                 :title="`${generation.versions} versions`"
                             >
                                 {{ generation.versions }}

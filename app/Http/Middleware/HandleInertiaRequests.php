@@ -10,6 +10,7 @@ use App\Models\OrgUser;
 use App\Models\User;
 use App\Services\Billing\CreditLedger;
 use App\Services\Pricing\Money;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
@@ -76,7 +77,7 @@ final class HandleInertiaRequests extends Middleware
      * The sidebar's history: the user's latest threads in their current organization, newest activity
      * first. Each is titled by its first prompt and links to its newest version.
      *
-     * @return list<array{id: int, prompt: string, status: string, versions: int, created_at: string|null}>
+     * @return list<array{id: int, prompt: string, status: string, versions: int, branches: int, created_at: string|null}>
      */
     private function recentGenerations(mixed $user): array
     {
@@ -95,12 +96,20 @@ final class HandleInertiaRequests extends Middleware
         $threadIds = $latest->pluck('thread_id')->all();
         $firstPrompts = $mine()->whereIn('id', $threadIds)->pluck('prompt', 'id');
         $versions = $mine()->whereIn('thread_id', $threadIds)->selectRaw('thread_id, count(*) as versions')->groupBy('thread_id')->pluck('versions', 'thread_id');
+        // A branch ends at a version nobody has continued from; more than one means the thread branches.
+        $branches = $mine()
+            ->whereIn('thread_id', $threadIds)
+            ->whereNotExists(fn (QueryBuilder $query): QueryBuilder => $query->selectRaw('1')->from('generations as follow_ups')->whereColumn('follow_ups.parent_id', 'generations.id'))
+            ->selectRaw('thread_id, count(*) as branches')
+            ->groupBy('thread_id')
+            ->pluck('branches', 'thread_id');
 
         return array_values($latest->map(fn (Generation $generation): array => [
             'id' => $generation->id,
             'prompt' => Str::limit(is_string($firstPrompts[$generation->thread_id] ?? null) ? $firstPrompts[$generation->thread_id] : '', 80),
             'status' => $generation->status->value,
             'versions' => is_numeric($versions[$generation->thread_id] ?? null) ? (int) $versions[$generation->thread_id] : 1,
+            'branches' => is_numeric($branches[$generation->thread_id] ?? null) ? (int) $branches[$generation->thread_id] : 1,
             'created_at' => $generation->created_at?->toIso8601String(),
         ])->all());
     }
