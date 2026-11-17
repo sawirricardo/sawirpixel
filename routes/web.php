@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Http\Controllers\Admin\ProfitReportController;
 use App\Http\Controllers\Admin\ProfitReportExportController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
+use App\Http\Controllers\ApiCatalogController;
 use App\Http\Controllers\Auth\EmailVerificationNoticeController;
 use App\Http\Controllers\Auth\EmailVerificationNotificationController;
 use App\Http\Controllers\Auth\LoginController;
@@ -35,14 +36,16 @@ use App\Http\Controllers\Settings\PersonalAccessTokenController;
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\RegeneratePersonalAccessTokenController;
 use App\Http\Controllers\SitemapController;
+use App\Http\Middleware\AdvertiseDiscovery;
 use App\Http\Middleware\NoIndex;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', HomeController::class)->name('home');
+Route::get('/', HomeController::class)->middleware(AdvertiseDiscovery::class)->name('home');
 Route::get('/robots.txt', RobotsController::class)->name('robots');
 Route::get('/sitemap.xml', SitemapController::class)->name('sitemap');
-Route::get('/terms', [LegalController::class, 'show'])->defaults('document', 'terms')->name('terms');
-Route::get('/privacy', [LegalController::class, 'show'])->defaults('document', 'privacy')->name('privacy');
+Route::get('/.well-known/api-catalog', ApiCatalogController::class)->name('api-catalog');
+Route::get('/terms', [LegalController::class, 'show'])->defaults('document', 'terms')->middleware(AdvertiseDiscovery::class)->name('terms');
+Route::get('/privacy', [LegalController::class, 'show'])->defaults('document', 'privacy')->middleware(AdvertiseDiscovery::class)->name('privacy');
 
 Route::post('/generations/estimate', GenerationEstimateController::class)
     ->middleware('throttle:60,1')

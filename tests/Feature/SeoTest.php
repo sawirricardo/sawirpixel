@@ -50,6 +50,43 @@ test('tells crawlers which paths to skip and where the sitemap is', function ():
         ->toContain('Sitemap: '.route('sitemap'));
 });
 
+test('names AI crawlers and says how content may be used, with Content Signals', function (): void {
+    $robots = (string) $this->get('/robots.txt')->getContent();
+
+    expect($robots)
+        ->toContain("User-agent: GPTBot\n")
+        ->toContain("User-agent: ClaudeBot\n")
+        ->toContain("User-agent: Google-Extended\n")
+        ->toContain("Content-Signal: search=yes, ai-input=yes, ai-train=no\n");
+    // Every group carries the same rules: the AI crawlers' group keeps private paths out too.
+    expect(mb_substr_count($robots, "Disallow: /settings\n"))->toBe(2);
+    expect(mb_substr_count($robots, 'Content-Signal:'))->toBe(2);
+});
+
+test('publishes an API catalog pointing to the API description and docs', function (): void {
+    $response = $this->get('/.well-known/api-catalog');
+
+    $response->assertOk()->assertHeader('Content-Type', 'application/linkset+json; profile="https://www.rfc-editor.org/info/rfc9727"');
+    expect($response->json('linkset.0'))->toBe([
+        'anchor' => url('/api'),
+        'service-desc' => [['href' => url('/docs/api.json'), 'type' => 'application/json']],
+        'service-doc' => [['href' => url('/docs/api'), 'type' => 'text/html']],
+    ]);
+});
+
+test('advertises discovery links on public pages', function (string $route): void {
+    $link = (string) $this->get(route($route))->headers->get('Link');
+
+    expect($link)
+        ->toContain('</.well-known/api-catalog>; rel="api-catalog"')
+        ->toContain('</docs/api.json>; rel="service-desc"')
+        ->toContain('</sitemap.xml>; rel="sitemap"');
+})->with(['home', 'terms', 'privacy']);
+
+test('serves the API docs to anyone, including agents without an account', function (): void {
+    $this->get('/docs/api.json')->assertOk()->assertJsonPath('info.title', config('app.name'));
+});
+
 test('lists only the public pages in the sitemap', function (): void {
     $response = $this->get('/sitemap.xml');
 
