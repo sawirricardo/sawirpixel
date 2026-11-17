@@ -5,6 +5,8 @@ export type PillOption<V extends string> = {
     value: V;
     label: string;
     hint?: string;
+    /** Shown but not selectable, e.g. turned off by the organization. */
+    disabled?: boolean;
 };
 
 const props = withDefaults(
@@ -22,8 +24,12 @@ const model = defineModel<T>({ required: true });
 const open = ref(false);
 const root = ref<HTMLElement | null>(null);
 
-function choose(value: T): void {
-    model.value = value;
+function choose(option: PillOption<T>): void {
+    if (option.disabled) {
+        return;
+    }
+
+    model.value = option.value;
     open.value = false;
 }
 
@@ -84,8 +90,10 @@ const selected = () =>
                     type="button"
                     role="option"
                     :aria-selected="option.value === model"
-                    class="flex w-full items-center justify-between gap-4 rounded-lg px-3 py-2 text-left text-sm hover:bg-zinc-100"
-                    @click="choose(option.value)"
+                    :aria-disabled="option.disabled ? 'true' : undefined"
+                    :disabled="option.disabled"
+                    class="flex w-full items-center justify-between gap-4 rounded-lg px-3 py-2 text-left text-sm enabled:hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    @click="choose(option)"
                 >
                     <span>
                         <span class="block text-zinc-900">{{

@@ -13,6 +13,7 @@ import type { PillOption } from '@/components/PillMenu.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { useAccessDialog } from '@/lib/accessDialog';
 import { useCreditsDialog } from '@/lib/creditsDialog';
+import { allowedValue, restrictOptions } from '@/lib/generationOptions';
 import { formatMoneyRange } from '@/lib/money';
 import type { CostEstimate, SharedProps } from '@/types';
 
@@ -30,28 +31,34 @@ const auth = computed(() => page.props.auth);
 const DRAFT_KEY = 'generate-draft';
 
 const sizeOptions = computed<PillOption<string>[]>(() =>
-    props.sizes.map((size) => ({
-        value: size,
-        label:
-            {
-                '1024x1024': 'Square',
-                '1536x1024': 'Landscape',
-                '1024x1536': 'Portrait',
-            }[size] ?? size,
-        hint: size.replace('x', ' × '),
-    })),
+    restrictOptions(
+        props.sizes.map((size) => ({
+            value: size,
+            label:
+                {
+                    '1024x1024': 'Square',
+                    '1536x1024': 'Landscape',
+                    '1024x1536': 'Portrait',
+                }[size] ?? size,
+            hint: size.replace('x', ' × '),
+        })),
+        auth.value.generationOptions?.sizes,
+    ),
 );
 
 const qualityOptions = computed<PillOption<string>[]>(() =>
-    props.qualities.map((quality) => ({
-        value: quality,
-        label: quality.charAt(0).toUpperCase() + quality.slice(1),
-        hint: {
-            low: 'Fastest, cheapest',
-            medium: 'Balanced',
-            high: 'Most detail',
-        }[quality],
-    })),
+    restrictOptions(
+        props.qualities.map((quality) => ({
+            value: quality,
+            label: quality.charAt(0).toUpperCase() + quality.slice(1),
+            hint: {
+                low: 'Fastest, cheapest',
+                medium: 'Balanced',
+                high: 'Most detail',
+            }[quality],
+        })),
+        auth.value.generationOptions?.qualities,
+    ),
 );
 
 const form = useForm({
@@ -76,6 +83,31 @@ const cannotAfford = computed(
         props.canGenerate &&
         estimate.response?.affordable === false &&
         !estimate.hasErrors,
+);
+
+/**
+ * Why the organization's limits would refuse this right now (a spending or image cap), if they would.
+ */
+const limitBlocked = computed(() =>
+    props.canGenerate && !estimate.hasErrors
+        ? (estimate.response?.blocked ?? null)
+        : null,
+);
+
+// Never leave a restricted quality or size selected, e.g. from a restored draft.
+watch(
+    () => [auth.value.generationOptions, form.size, form.quality],
+    () => {
+        form.size = allowedValue(
+            form.size,
+            auth.value.generationOptions?.sizes,
+        );
+        form.quality = allowedValue(
+            form.quality,
+            auth.value.generationOptions?.qualities,
+        );
+    },
+    { immediate: true },
 );
 const noPermission = ref(false);
 const readyMessage = ref<string | null>(null);
@@ -276,6 +308,7 @@ const errors = computed(
 );
 const firstError = computed(
     () =>
+        errors.value.limit ??
         errors.value.credits ??
         errors.value.prompt ??
         errors.value.size ??
@@ -286,7 +319,9 @@ const firstError = computed(
         )?.[1],
 );
 
-const canSubmit = computed(() => form.prompt.trim() !== '' && !form.processing);
+const canSubmit = computed(
+    () => form.prompt.trim() !== '' && !form.processing && !limitBlocked.value,
+);
 
 function submit(): void {
     if (!canSubmit.value) {
@@ -308,6 +343,10 @@ function submit(): void {
     if (!page.props.auth.user?.email_verified) {
         router.visit('/email/verify');
 
+        return;
+    }
+
+    if (limitBlocked.value) {
         return;
     }
 
@@ -585,8 +624,16 @@ function onKeydown(event: KeyboardEvent): void {
                 {{ firstError }}
             </p>
 
+            <p
+                v-if="limitBlocked && !firstError"
+                class="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-900"
+                role="status"
+            >
+                {{ limitBlocked }}
+            </p>
+
             <div
-                v-if="cannotAfford && estimate.response"
+                v-else-if="cannotAfford && estimate.response"
                 class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-900"
                 role="status"
             >

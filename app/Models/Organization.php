@@ -17,6 +17,16 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property-read int $id
  * @property string $name
  * @property string $credit_balance Exact USD, kept in step with the credit ledger by CreditLedger.
+ * @property string|null $spend_limit_daily USD; null means no limit.
+ * @property string|null $spend_limit_monthly
+ * @property int|null $generation_limit_daily
+ * @property int|null $generation_limit_monthly
+ * @property string|null $member_spend_limit_daily Applies to each member who can't change the settings.
+ * @property string|null $member_spend_limit_monthly
+ * @property int|null $member_generation_limit_daily
+ * @property int|null $member_generation_limit_monthly
+ * @property list<string>|null $member_qualities Qualities members may use; null means all.
+ * @property list<string>|null $member_sizes Sizes members may use; null means all.
  */
 final class Organization extends Model
 {
@@ -39,6 +49,16 @@ final class Organization extends Model
      */
     protected $casts = [
         'credit_balance' => 'decimal:10',
+        'spend_limit_daily' => 'decimal:10',
+        'spend_limit_monthly' => 'decimal:10',
+        'generation_limit_daily' => 'integer',
+        'generation_limit_monthly' => 'integer',
+        'member_spend_limit_daily' => 'decimal:10',
+        'member_spend_limit_monthly' => 'decimal:10',
+        'member_generation_limit_daily' => 'integer',
+        'member_generation_limit_monthly' => 'integer',
+        'member_qualities' => 'array',
+        'member_sizes' => 'array',
     ];
 
     /**

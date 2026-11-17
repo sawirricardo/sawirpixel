@@ -19,6 +19,7 @@ test('estimates the exact charge range from pixelforge pricing plus the markup',
             'max' => ['amount' => '0.0863250000', 'formatted' => '$0.09'],
         ],
         'affordable' => null,
+        'blocked' => null,
     ]);
     // Provider costs and token counts stay internal: they'd reveal the supplier's pricing and our margin.
     $response->assertJsonMissingPath('provider_cost')->assertJsonMissingPath('tokens');

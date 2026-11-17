@@ -24,6 +24,7 @@ use App\Http\Controllers\MarkNotificationsReadController;
 use App\Http\Controllers\MemberController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OrganizationController;
+use App\Http\Controllers\OrganizationLimitsController;
 use App\Http\Controllers\OrganizationSettingsController;
 use App\Http\Controllers\PixelforgeWebhookController;
 use App\Http\Controllers\ReceivedInvitationController;
@@ -88,6 +89,7 @@ Route::middleware(['auth', NoIndex::class])->group(function (): void {
     Route::get('/organization/settings', [OrganizationSettingsController::class, 'edit'])->name('organization.settings');
     Route::patch('/organization/settings', [OrganizationSettingsController::class, 'update'])->name('organization.update');
     Route::delete('/organization/settings', [OrganizationSettingsController::class, 'destroy'])->name('organization.destroy');
+    Route::patch('/organization/limits', [OrganizationLimitsController::class, 'update'])->name('organization.limits');
     Route::redirect('/organization/members', '/organization/settings')->name('members.index');
     Route::patch('/organization/members/{member}', [MemberController::class, 'update'])->name('members.update');
     Route::delete('/organization/members/{member}', [MemberController::class, 'destroy'])->name('members.destroy');

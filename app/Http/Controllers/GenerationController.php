@@ -11,6 +11,7 @@ use App\Models\Generation;
 use App\Models\User;
 use App\Notifications\GenerationFinished;
 use App\Services\Billing\CreditLedger;
+use App\Services\Generations\GenerationLimiter;
 use App\Services\Generations\GenerationThread;
 use App\Services\Pricing\GenerationCostEstimator;
 use App\Services\Pricing\Money;
@@ -89,7 +90,7 @@ final class GenerationController
         ]);
     }
 
-    public function store(StoreGenerationRequest $request, #[CurrentUser] User $user, GenerationCostEstimator $estimator, CreditLedger $ledger): RedirectResponse
+    public function store(StoreGenerationRequest $request, #[CurrentUser] User $user, GenerationCostEstimator $estimator, CreditLedger $ledger, GenerationLimiter $limiter): RedirectResponse
     {
         $organization = $user->currentOrganization;
 
@@ -115,8 +116,16 @@ final class GenerationController
 
         // Reserve the most it can cost. The estimate is worked out first: it may fetch pricing over HTTP,
         // which shouldn't happen while the user's row is locked.
-        $generation = DB::transaction(function () use ($request, $user, $organization, $estimate, $ledger, $parent, $referenceImages): Generation {
+        $generation = DB::transaction(function () use ($request, $user, $organization, $estimate, $ledger, $limiter, $parent, $referenceImages): Generation {
             $lockedOrganization = $ledger->lockOrganization($organization->id);
+
+            // Checked under the lock, so concurrent submissions can't both squeeze under a limit.
+            $blockedReason = $limiter->blockedReason($user, $lockedOrganization, $request->size(), $request->quality(), $estimate->chargeMax);
+
+            if ($blockedReason !== null) {
+                throw ValidationException::withMessages(['limit' => $blockedReason]);
+            }
+
             $balance = BigDecimal::of($lockedOrganization->credit_balance);
 
             if ($balance->isLessThan($estimate->chargeMax)) {

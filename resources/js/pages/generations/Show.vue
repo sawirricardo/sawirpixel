@@ -13,6 +13,7 @@ import PillMenu from '@/components/PillMenu.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { useCreditsDialog } from '@/lib/creditsDialog';
 import { describeExpiry } from '@/lib/expiry';
+import { allowedValue, restrictOptions } from '@/lib/generationOptions';
 import { formatMoneyRange } from '@/lib/money';
 import { useNow } from '@/lib/useNow';
 import type {
@@ -114,16 +115,26 @@ const form = useForm({
     parent_id: null as number | null,
 });
 
-const sizeOptions = [
-    { value: '1024x1024', label: 'Square', hint: '1024 × 1024' },
-    { value: '1536x1024', label: 'Landscape', hint: '1536 × 1024' },
-    { value: '1024x1536', label: 'Portrait', hint: '1024 × 1536' },
-];
-const qualityOptions = [
-    { value: 'low', label: 'Low', hint: 'Fastest, cheapest' },
-    { value: 'medium', label: 'Medium', hint: 'Balanced' },
-    { value: 'high', label: 'High', hint: 'Most detail' },
-];
+const sizeOptions = computed(() =>
+    restrictOptions(
+        [
+            { value: '1024x1024', label: 'Square', hint: '1024 × 1024' },
+            { value: '1536x1024', label: 'Landscape', hint: '1536 × 1024' },
+            { value: '1024x1536', label: 'Portrait', hint: '1024 × 1536' },
+        ],
+        page.props.auth.generationOptions?.sizes,
+    ),
+);
+const qualityOptions = computed(() =>
+    restrictOptions(
+        [
+            { value: 'low', label: 'Low', hint: 'Fastest, cheapest' },
+            { value: 'medium', label: 'Medium', hint: 'Balanced' },
+            { value: 'high', label: 'High', hint: 'Most detail' },
+        ],
+        page.props.auth.generationOptions?.qualities,
+    ),
+);
 
 const estimate = useHttp<
     {
@@ -173,14 +184,37 @@ const errors = computed(
 );
 const firstError = computed(
     () =>
+        errors.value.limit ??
         errors.value.credits ??
         errors.value.parent_id ??
         errors.value.prompt ??
         errors.value.reference_images,
 );
 
+// Never leave a restricted quality or size selected, e.g. from a version made before the restriction.
+watch(
+    () => [page.props.auth.generationOptions, form.size, form.quality],
+    () => {
+        form.size = allowedValue(
+            form.size,
+            page.props.auth.generationOptions?.sizes,
+        );
+        form.quality = allowedValue(
+            form.quality,
+            page.props.auth.generationOptions?.qualities,
+        );
+    },
+    { immediate: true },
+);
+
+/** Why the organization's limits would refuse this follow-up, if they would. */
+const limitBlocked = computed(() =>
+    estimate.hasErrors ? null : (estimate.response?.blocked ?? null),
+);
+
 const canSend = computed(
     () =>
+        !limitBlocked.value &&
         form.prompt.trim() !== '' &&
         !form.processing &&
         parent.value?.can_continue === true,
@@ -583,6 +617,13 @@ function versionNumber(version: ThreadVersion): number {
                     role="alert"
                 >
                     {{ firstError }}
+                </p>
+                <p
+                    v-else-if="limitBlocked"
+                    class="mt-2 px-2 text-sm text-amber-800"
+                    role="status"
+                >
+                    {{ limitBlocked }}
                 </p>
                 <p
                     v-else-if="estimate.response?.affordable === false"

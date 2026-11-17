@@ -9,6 +9,7 @@ use App\Models\Organization;
 use App\Models\OrgUser;
 use App\Models\User;
 use App\Services\Billing\CreditLedger;
+use App\Services\Generations\GenerationLimiter;
 use App\Services\Pricing\Money;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Http\Request;
@@ -71,6 +72,12 @@ final class HandleInertiaRequests extends Middleware
                     ->sortBy('name')
                     ->values()
                     ->all() : [],
+                // Which qualities and sizes this user may pick in the current organization.
+                'generationOptions' => fn (): ?array => $user instanceof User && $user->current_organization_id !== null
+                    && ($organization = Organization::query()->find($user->current_organization_id)) instanceof Organization ? [
+                        'qualities' => resolve(GenerationLimiter::class)->allowedQualities($user, $organization),
+                        'sizes' => resolve(GenerationLimiter::class)->allowedSizes($user, $organization),
+                    ] : null,
                 'canViewMembers' => fn (): bool => $user instanceof User && $user->currentOrganization !== null
                     && Gate::forUser($user)->allows('viewMembers', $user->currentOrganization),
             ],

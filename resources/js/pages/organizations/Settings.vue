@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
+import OrganizationLimits, {
+    type LimitValues,
+} from '@/components/OrganizationLimits.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import type { Money } from '@/types';
 
@@ -12,6 +15,14 @@ const props = defineProps<{
     canDelete: boolean;
     creditBalance: Money;
     hasCredits: boolean;
+    limits: {
+        values: LimitValues;
+        usage: {
+            day: { spent: Money; generations: number };
+            month: { spent: Money; generations: number };
+        };
+        resets: { day: string; month: string };
+    };
     members: {
         id: number;
         name: string;
@@ -193,6 +204,8 @@ function expiresIn(date: string): string {
                 >
             </p>
         </section>
+
+        <OrganizationLimits :limits="limits" :can-update="canUpdate" />
 
         <h2 class="mt-10 text-lg font-semibold">Members</h2>
 

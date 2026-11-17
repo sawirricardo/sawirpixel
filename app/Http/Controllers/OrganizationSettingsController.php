@@ -7,7 +7,10 @@ namespace App\Http\Controllers;
 use App\Actions\DeleteOrganization;
 use App\Actions\GrantableAccess;
 use App\Enums\Permission as PermissionEnum;
+use App\Enums\Pixelforge\ImageQuality;
+use App\Enums\Pixelforge\ImageSize;
 use App\Http\Requests\DeleteOrganizationRequest;
+use App\Http\Requests\UpdateOrganizationLimitsRequest;
 use App\Http\Requests\UpdateOrganizationRequest;
 use App\Models\Organization;
 use App\Models\OrgInvitation;
@@ -15,8 +18,11 @@ use App\Models\OrgUser;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\Generations\GenerationLimiter;
 use App\Services\Pricing\Money;
 use Brick\Math\BigDecimal;
+use Brick\Math\RoundingMode;
+use Carbon\CarbonImmutable;
 use Illuminate\Container\Attributes\CurrentUser;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Gate;
@@ -28,7 +34,7 @@ use Inertia\Response;
  */
 final class OrganizationSettingsController
 {
-    public function edit(#[CurrentUser] User $user, GrantableAccess $grantableAccess): Response|RedirectResponse
+    public function edit(#[CurrentUser] User $user, GrantableAccess $grantableAccess, GenerationLimiter $limiter): Response|RedirectResponse
     {
         $organization = $user->currentOrganization;
 
@@ -47,6 +53,7 @@ final class OrganizationSettingsController
             'canDelete' => Gate::allows('delete', $organization),
             'creditBalance' => Money::toArray($organization->credit_balance),
             'hasCredits' => BigDecimal::of($organization->credit_balance)->isPositive(),
+            'limits' => $this->limits($organization, $limiter),
             'members' => $organization->orgUsers()
                 ->with(['user:id,name,email', 'roles:id,name', 'permissions'])
                 ->oldest('id')
@@ -108,5 +115,44 @@ final class OrganizationSettingsController
         Inertia::flash('success', sprintf('%s was deleted.', $organization->name));
 
         return to_route('home');
+    }
+
+    /**
+     * The limits as the form edits them (amounts in plain dollars, every option ticked when unrestricted),
+     * with what's been used against them.
+     *
+     * @return array{values: array<string, string|int|list<string>|null>, usage: array{day: array{spent: array{amount: string, formatted: string}, generations: int}, month: array{spent: array{amount: string, formatted: string}, generations: int}}, resets: array{day: string, month: string}}
+     */
+    private function limits(Organization $organization, GenerationLimiter $limiter): array
+    {
+        $values = [];
+
+        foreach (UpdateOrganizationLimitsRequest::SPEND_LIMITS as $field) {
+            $amount = $organization->{$field};
+            $values[$field] = is_string($amount) ? (string) BigDecimal::of($amount)->toScale(2, RoundingMode::Down) : null;
+        }
+
+        foreach (UpdateOrganizationLimitsRequest::GENERATION_LIMITS as $field) {
+            $count = $organization->{$field};
+            $values[$field] = is_int($count) ? $count : null;
+        }
+
+        $values['member_qualities'] = $organization->member_qualities ?? array_map(fn (ImageQuality $quality): string => $quality->value, ImageQuality::cases());
+        $values['member_sizes'] = $organization->member_sizes ?? array_map(fn (ImageSize $size): string => $size->value, ImageSize::cases());
+
+        $usage = $limiter->usage($organization);
+        $now = CarbonImmutable::now('UTC');
+
+        return [
+            'values' => $values,
+            'usage' => [
+                'day' => ['spent' => Money::toArray($usage['day']['spent']), 'generations' => $usage['day']['generations']],
+                'month' => ['spent' => Money::toArray($usage['month']['spent']), 'generations' => $usage['month']['generations']],
+            ],
+            'resets' => [
+                'day' => $now->startOfDay()->addDay()->toIso8601String(),
+                'month' => $now->startOfMonth()->addMonth()->toIso8601String(),
+            ],
+        ];
     }
 }

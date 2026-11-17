@@ -51,6 +51,7 @@ export type SharedProps = {
         organizations: { id: number; name: string }[];
         canViewMembers: boolean;
         credits: { balance: Money; reserved: Money; canBuy: boolean } | null;
+        generationOptions: { qualities: string[]; sizes: string[] } | null;
     };
 };
 
@@ -63,6 +64,8 @@ export type CostEstimate = {
     charge: Range<Money>;
     /** Whether the organization's balance covers the maximum; null for guests. */
     affordable: boolean | null;
+    /** Why the organization's limits would refuse this, if they would. */
+    blocked: string | null;
 };
 
 export type GenerationStatus =
