@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\ProfitReportExportController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RegisterController;
+use App\Http\Controllers\CreditController;
 use App\Http\Controllers\CreditPurchaseController;
 use App\Http\Controllers\CurrentOrganizationController;
 use App\Http\Controllers\GenerationController;
@@ -42,6 +43,7 @@ Route::middleware('guest')->group(function (): void {
 Route::middleware('auth')->group(function (): void {
     Route::post('/logout', [LoginController::class, 'destroy'])->name('logout');
 
+    Route::get('/credits', [CreditController::class, 'index'])->name('credits.index');
     Route::post('/credits/purchases', CreditPurchaseController::class)->middleware('throttle:20,1')->name('credits.purchase');
 
     Route::get('/organizations/create', [OrganizationController::class, 'create'])->name('organizations.create');

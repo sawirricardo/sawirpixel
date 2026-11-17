@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Link, usePage } from '@inertiajs/vue3';
+import { Link, router, usePage } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
 import AccessDialog from '@/components/AccessDialog.vue';
 import BuyCreditsDialog from '@/components/BuyCreditsDialog.vue';
@@ -121,8 +121,7 @@ const success = computed(() => {
                             <button
                                 v-if="auth.credits"
                                 type="button"
-                                class="flex items-center gap-1.5 rounded-full border border-zinc-200 px-3 py-1 font-medium tabular-nums enabled:hover:bg-zinc-100 disabled:cursor-default"
-                                :disabled="!auth.credits.canBuy"
+                                class="flex items-center gap-1.5 rounded-full border border-zinc-200 px-3 py-1 font-medium tabular-nums hover:bg-zinc-100"
                                 :title="
                                     [
                                         `${auth.organization?.name} credits`,
@@ -131,12 +130,16 @@ const success = computed(() => {
                                             : `${auth.credits.reserved.formatted} set aside for images in progress`,
                                         auth.credits.canBuy
                                             ? 'Buy credits'
-                                            : 'Ask an owner or admin to buy credits',
+                                            : 'View credit history',
                                     ]
                                         .filter(Boolean)
                                         .join(' · ')
                                 "
-                                @click="creditsDialog.show()"
+                                @click="
+                                    auth.credits.canBuy
+                                        ? creditsDialog.show()
+                                        : router.visit('/credits')
+                                "
                             >
                                 {{ auth.credits.balance.formatted }}
                                 <span

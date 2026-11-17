@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useForm, usePage } from '@inertiajs/vue3';
+import { Link, useForm, usePage } from '@inertiajs/vue3';
 import { computed, nextTick, ref, watch } from 'vue';
 import type { SharedProps } from '@/types';
 
@@ -89,6 +89,14 @@ function closeOnBackdrop(event: MouseEvent): void {
                     {{ form.errors.pack }}
                 </p>
             </fieldset>
+
+            <Link
+                href="/credits"
+                class="mt-3 inline-block text-xs font-medium text-zinc-600 hover:text-zinc-900"
+                @click="open = false"
+            >
+                View credit history →
+            </Link>
 
             <p class="mt-4 text-xs text-zinc-500">
                 This is a demo checkout: no payment is taken, the credits are

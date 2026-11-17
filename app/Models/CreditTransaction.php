@@ -8,6 +8,7 @@ use App\Enums\CreditTransactionType;
 use Database\Factories\CreditTransactionFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * One entry in an organization's credit ledger. Amounts are signed: credits added are positive, spent
@@ -35,4 +36,20 @@ final class CreditTransaction extends Model
         'amount' => 'decimal:10',
         'balance_after' => 'decimal:10',
     ];
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    /**
+     * @return BelongsTo<Generation, $this>
+     */
+    public function generation(): BelongsTo
+    {
+        return $this->belongsTo(Generation::class);
+    }
 }

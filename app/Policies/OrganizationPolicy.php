@@ -6,6 +6,7 @@ namespace App\Policies;
 
 use App\Enums\Permission;
 use App\Models\Organization;
+use App\Models\OrgUser;
 use App\Models\User;
 
 /**
@@ -31,6 +32,14 @@ final class OrganizationPolicy
     public function manageRoles(User $user, Organization $organization): bool
     {
         return $this->allows($user, $organization, Permission::ManageRoles);
+    }
+
+    /**
+     * Any member can see the organization's credit history: it's the shared balance they spend from.
+     */
+    public function viewCredits(User $user, Organization $organization): bool
+    {
+        return $user->membershipIn($organization) instanceof OrgUser;
     }
 
     public function buyCredits(User $user, Organization $organization): bool

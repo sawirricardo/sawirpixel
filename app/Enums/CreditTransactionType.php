@@ -17,4 +17,14 @@ enum CreditTransactionType: string
 
     /** What a succeeded generation actually cost. */
     case Charge = 'charge';
+
+    public function label(): string
+    {
+        return match ($this) {
+            self::Purchase => 'Purchase',
+            self::Hold => 'Reserved',
+            self::HoldRelease => 'Returned',
+            self::Charge => 'Charged',
+        };
+    }
 }

@@ -89,6 +89,14 @@ onBeforeUnmount(() =>
                 Members
             </Link>
             <Link
+                href="/credits"
+                role="menuitem"
+                class="block rounded-lg px-3 py-2 hover:bg-zinc-100"
+                @click="open = false"
+            >
+                Credits
+            </Link>
+            <Link
                 href="/organizations/create"
                 role="menuitem"
                 class="block rounded-lg px-3 py-2 hover:bg-zinc-100"
