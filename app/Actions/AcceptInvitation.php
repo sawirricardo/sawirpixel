@@ -4,15 +4,18 @@ declare(strict_types=1);
 
 namespace App\Actions;
 
+use App\Enums\Permission as PermissionEnum;
 use App\Models\Organization;
 use App\Models\OrgInvitation;
 use App\Models\OrgUser;
+use App\Models\Permission;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Adds the invited user to the organization with the invited role and switches them to it.
+ * Adds the invited user to the organization with the invited roles and permissions, and switches them to it.
+ * Someone who is already a member keeps their current access.
  */
 final readonly class AcceptInvitation
 {
@@ -34,7 +37,9 @@ final readonly class AcceptInvitation
             }
 
             if (! $user->membershipIn($organization) instanceof OrgUser) {
-                $organization->orgUsers()->create(['user_id' => $user->id])->assignRole($invitation->role()->sole());
+                $membership = $organization->orgUsers()->create(['user_id' => $user->id]);
+                $membership->assignRole(...$invitation->roles()->get()->all());
+                $membership->givePermissionTo(...$invitation->permissions()->get()->map(fn (Permission $permission): PermissionEnum => $permission->name)->all());
             }
 
             $invitation->update(['accepted_at' => now()]);

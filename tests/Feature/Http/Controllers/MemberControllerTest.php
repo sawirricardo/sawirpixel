@@ -34,7 +34,10 @@ describe('index', function (): void {
             ->where('members.1.role.name', 'Member')
             ->has('invitations', 1)
             ->where('invitations.0.email', 'pending@example.com')
+            ->where('invitations.0.roles', ['Member'])
             ->has('roles', 3)
+            ->has('grantable.roles', 3)
+            ->has('grantable.permissions', 7)
             ->where('can', ['invite' => true, 'remove' => true, 'manageRoles' => true]));
     });
 
@@ -48,7 +51,19 @@ describe('index', function (): void {
         $response->assertInertia(fn (Assert $page): Assert => $page
             ->has('members', 2)
             ->has('invitations', 0)
+            ->where('grantable', ['roles' => [], 'permissions' => []])
             ->where('can', ['invite' => false, 'remove' => false, 'manageRoles' => false]));
+    });
+
+    test('offers an admin only the roles and permissions they hold themselves', function (): void {
+        $organization = organizationOwner()->currentOrganization;
+        $admin = addMember($organization, DefaultRole::Admin);
+
+        $response = $this->actingAs($admin)->get(route('members.index'));
+
+        $response->assertInertia(fn (Assert $page): Assert => $page
+            ->where('grantable.roles', fn ($roles): bool => collect($roles)->pluck('name')->all() === ['Admin', 'Member'])
+            ->has('grantable.permissions', 6));
     });
 
     test('asks a user without an organization to create one first', function (): void {

@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Actions\AcceptInvitation;
 use App\Models\OrgInvitation;
+use App\Models\Permission;
 use App\Models\User;
 use Illuminate\Container\Attributes\CurrentUser;
 use Illuminate\Http\RedirectResponse;
@@ -31,7 +32,8 @@ final class InvitationAcceptanceController
             'invitation' => $invitation instanceof OrgInvitation ? [
                 'email' => $invitation->email,
                 'organization' => $invitation->organization->name ?? '',
-                'role' => $invitation->role->name ?? '',
+                'roles' => $invitation->roles->pluck('name')->all(),
+                'permissions' => $invitation->permissions->map(fn (Permission $permission): string => $permission->name->label())->all(),
                 'inviter' => $invitation->invitedBy?->name,
                 'is_pending' => $invitation->isPending(),
             ] : null,
@@ -55,7 +57,7 @@ final class InvitationAcceptanceController
     private function find(string $token): ?OrgInvitation
     {
         return OrgInvitation::query()
-            ->with(['organization:id,name', 'role:id,name', 'invitedBy:id,name'])
+            ->with(['organization:id,name', 'roles:id,name', 'permissions', 'invitedBy:id,name'])
             ->where('token_hash', OrgInvitation::hashToken($token))
             ->first();
     }

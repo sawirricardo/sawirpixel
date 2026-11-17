@@ -3,25 +3,27 @@
 declare(strict_types=1);
 
 use App\Enums\DefaultRole;
+use App\Enums\Permission;
 use App\Models\OrgInvitation;
 use App\Models\User;
 use Inertia\Testing\AssertableInertia as Assert;
 
-test('adds the invited user with the invited role and switches them to the organization', function (): void {
+test('adds the invited user with the invited roles and permissions and switches them to the organization', function (): void {
     $owner = organizationOwner();
     $organization = $owner->currentOrganization;
-    $invitation = OrgInvitation::factory()->for($organization)->withToken('secret')->create([
-        'email' => 'grace@example.com',
-        'role_id' => $organization->roles()->where('name', 'Admin')->value('id'),
-    ]);
+    $invitation = OrgInvitation::factory()->for($organization)->withRoles([DefaultRole::Admin])->withToken('secret')->create(['email' => 'grace@example.com']);
+    $invitation->givePermissionTo(Permission::DeleteOrganization);
+
     $grace = User::factory()->create(['email' => 'Grace@Example.com']);
 
     $response = $this->actingAs($grace)->post(route('invitations.accept', 'secret'));
 
     $response->assertRedirect(route('home'));
 
-    expect($grace->refresh()->current_organization_id)->toBe($organization->id);
-    expect($grace->membershipIn($organization)?->hasRole(DefaultRole::Admin->value))->toBeTrue();
+    $membership = $grace->refresh()->membershipIn($organization);
+    expect($grace->current_organization_id)->toBe($organization->id);
+    expect($membership?->roles()->pluck('name')->all())->toBe(['Admin']);
+    expect($membership?->hasDirectPermission(Permission::DeleteOrganization))->toBeTrue();
     expect($invitation->refresh()->accepted_at)->not->toBeNull();
 });
 
@@ -69,7 +71,8 @@ test('shows a guest the invitation and brings them back to it after logging in',
     $this->get(route('invitations.show', 'secret'))->assertOk()->assertInertia(fn (Assert $page): Assert => $page
         ->component('invitations/Show')
         ->where('invitation.email', 'grace@example.com')
-        ->where('invitation.role', 'Member')
+        ->where('invitation.roles', ['Member'])
+        ->where('invitation.permissions', [])
         ->where('invitation.is_pending', true)
         ->where('emailMatches', false));
     $login = $this->post(route('login'), ['email' => 'grace@example.com', 'password' => 'password']);

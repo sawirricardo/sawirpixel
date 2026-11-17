@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions;
 
+use App\Enums\Permission;
 use App\Mail\OrgInvitationMail;
 use App\Models\Organization;
 use App\Models\OrgInvitation;
@@ -14,26 +15,34 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 
 /**
- * Invites an email address to an organization with a role. A fresh invitation replaces any pending
+ * Invites an email address to an organization with roles and, optionally, extra permissions. A fresh invitation replaces any pending
  * one for the same address, so only the latest link works.
  */
 final readonly class InviteMember
 {
-    public function handle(User $inviter, Organization $organization, string $email, Role $role): OrgInvitation
+    /**
+     * @param  list<Role>  $roles
+     * @param  list<Permission>  $permissions  Granted directly, on top of the roles.
+     */
+    public function handle(User $inviter, Organization $organization, string $email, array $roles, array $permissions = []): OrgInvitation
     {
         $token = Str::random(40);
         $email = mb_strtolower($email);
 
-        $invitation = DB::transaction(function () use ($inviter, $organization, $email, $role, $token): OrgInvitation {
-            $organization->pendingInvitations()->where('email', $email)->delete();
+        $invitation = DB::transaction(function () use ($inviter, $organization, $email, $roles, $permissions, $token): OrgInvitation {
+            $organization->pendingInvitations()->where('email', $email)->get()->each->delete();
 
-            return $organization->invitations()->create([
-                'role_id' => $role->id,
+            $invitation = $organization->invitations()->create([
                 'invited_by_id' => $inviter->id,
                 'email' => $email,
                 'token_hash' => OrgInvitation::hashToken($token),
                 'expires_at' => now()->addDays(OrgInvitation::EXPIRES_AFTER_DAYS),
             ]);
+
+            $invitation->assignRole(...$roles);
+            $invitation->givePermissionTo(...$permissions);
+
+            return $invitation;
         });
 
         Mail::to($email)->queue(new OrgInvitationMail($invitation, $token));

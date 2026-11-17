@@ -38,7 +38,7 @@ final class OrgInvitationMail extends Mailable implements ShouldQueue
             markdown: 'mail.org-invitation',
             with: [
                 'organizationName' => $this->invitation->organization->name ?? '',
-                'roleName' => $this->invitation->role->name ?? '',
+                'roleNames' => $this->invitation->roles()->pluck('name')->join(', ', ' and '),
                 'inviterName' => $this->invitation->invitedBy?->name,
                 'acceptUrl' => route('invitations.show', $this->token),
                 'expiresAt' => $this->invitation->expires_at->toFormattedDayDateString(),

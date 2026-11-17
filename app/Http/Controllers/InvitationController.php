@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Actions\InviteMember;
-use App\Enums\DefaultRole;
 use App\Http\Requests\StoreInvitationRequest;
 use App\Models\Organization;
 use App\Models\OrgInvitation;
@@ -13,7 +12,6 @@ use App\Models\User;
 use Illuminate\Container\Attributes\CurrentUser;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 final class InvitationController
@@ -24,13 +22,7 @@ final class InvitationController
         abort_unless($organization instanceof Organization, 404);
         Gate::authorize('inviteMembers', $organization);
 
-        $role = $request->role();
-
-        if ($role->name === DefaultRole::Owner->value && ! $user->membershipIn($organization)?->hasRole(DefaultRole::Owner->value)) {
-            throw ValidationException::withMessages(['role_id' => 'Only owners can invite someone as an owner.']);
-        }
-
-        $invitation = $inviteMember->handle($user, $organization, $request->string('email')->value(), $role);
+        $invitation = $inviteMember->handle($user, $organization, $request->string('email')->value(), $request->roles(), $request->permissions());
 
         Inertia::flash('success', sprintf('Invitation sent to %s.', $invitation->email));
 

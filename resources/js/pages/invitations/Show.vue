@@ -10,7 +10,8 @@ const props = defineProps<{
     invitation: {
         email: string;
         organization: string;
-        role: string;
+        roles: string[];
+        permissions: string[];
         inviter: string | null;
         is_pending: boolean;
     } | null;
@@ -58,7 +59,13 @@ const errors = computed(
                     </template>
                     <template v-else>You've been invited</template>
                     <strong>{{ invitation.email }}</strong> to join as
-                    <strong>{{ invitation.role }}</strong>.
+                    <strong>{{ invitation.roles.join(', ') }}</strong>.
+                </p>
+                <p
+                    v-if="invitation.permissions.length"
+                    class="mt-1 text-sm text-zinc-600"
+                >
+                    Also: {{ invitation.permissions.join(', ') }}.
                 </p>
 
                 <p

@@ -7,7 +7,6 @@ namespace Database\Factories;
 use App\Enums\DefaultRole;
 use App\Models\Organization;
 use App\Models\OrgInvitation;
-use App\Models\Role;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
 
@@ -25,20 +24,38 @@ final class OrgInvitationFactory extends Factory
     {
         return [
             'organization_id' => Organization::factory(),
-            'role_id' => function (array $attributes): int {
-                $memberRoleId = Role::query()
-                    ->where('organization_id', $attributes['organization_id'])
-                    ->where('name', DefaultRole::Member->value)
-                    ->value('id');
-
-                return is_int($memberRoleId) ? $memberRoleId : Role::factory()->create(['organization_id' => $attributes['organization_id']])->id;
-            },
             'invited_by_id' => null,
             'email' => fake()->unique()->safeEmail(),
             'token_hash' => OrgInvitation::hashToken(Str::random(40)),
             'expires_at' => now()->addDays(OrgInvitation::EXPIRES_AFTER_DAYS),
             'accepted_at' => null,
         ];
+    }
+
+    /**
+     * Invitations get the organization's Member role unless a test attaches others.
+     */
+    public function configure(): static
+    {
+        return $this->afterCreating(function (OrgInvitation $invitation): void {
+            if ($invitation->roles()->doesntExist()) {
+                $invitation->assignRole($invitation->organization()->sole()->roles()->where('name', DefaultRole::Member->value)->sole());
+            }
+        });
+    }
+
+    /**
+     * @param  list<DefaultRole>  $roles
+     */
+    public function withRoles(array $roles): static
+    {
+        return $this->afterCreating(function (OrgInvitation $invitation) use ($roles): void {
+            $invitation->roles()->detach();
+            $invitation->assignRole(...$invitation->organization()->sole()->roles()
+                ->whereIn('name', array_map(fn (DefaultRole $role): string => $role->value, $roles))
+                ->get()
+                ->all());
+        });
     }
 
     public function withToken(string $token): static

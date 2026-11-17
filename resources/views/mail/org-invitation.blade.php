@@ -2,9 +2,9 @@
 # Join {{ $organizationName }}
 
 @if ($inviterName)
-{{ $inviterName }} has invited you to join **{{ $organizationName }}** as **{{ $roleName }}**.
+{{ $inviterName }} has invited you to join **{{ $organizationName }}** as **{{ $roleNames }}**.
 @else
-You have been invited to join **{{ $organizationName }}** as **{{ $roleName }}**.
+You have been invited to join **{{ $organizationName }}** as **{{ $roleNames }}**.
 @endif
 
 <x-mail::button :url="$acceptUrl">

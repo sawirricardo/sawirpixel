@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, router, useForm, usePage } from '@inertiajs/vue3';
-import { computed, reactive, watch } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 
 type RoleOption = { id: number; name: string };
@@ -12,15 +12,22 @@ const props = defineProps<{
         name: string;
         email: string;
         role: RoleOption | null;
+        roles: string[];
+        permissions: string[];
         is_you: boolean;
     }[];
     invitations: {
         id: number;
         email: string;
-        role: RoleOption | null;
+        roles: string[];
+        permissions: string[];
         expires_at: string;
     }[];
     roles: RoleOption[];
+    grantable: {
+        roles: RoleOption[];
+        permissions: { value: string; label: string }[];
+    };
     can: { invite: boolean; remove: boolean; manageRoles: boolean };
 }>();
 
@@ -29,17 +36,23 @@ const pageErrors = computed(
     () => page.props.errors as Record<string, string | undefined>,
 );
 
-const memberRole = props.roles.find((role) => role.name === 'Member');
+const memberRole = props.grantable.roles.find((role) => role.name === 'Member');
 
 const invite = useForm({
     email: '',
-    role_id: memberRole?.id ?? props.roles[0]?.id ?? 0,
+    role_ids: memberRole ? [memberRole.id] : ([] as number[]),
+    permissions: [] as string[],
 });
+
+const showExtraPermissions = ref(false);
 
 function sendInvite(): void {
     invite.post('/organization/invitations', {
         preserveScroll: true,
-        onSuccess: () => invite.reset('email'),
+        onSuccess: () => {
+            invite.reset('email', 'permissions');
+            showExtraPermissions.value = false;
+        },
     });
 }
 
@@ -123,43 +136,106 @@ function expiresIn(date: string): string {
 
         <form
             v-if="can.invite"
-            class="mt-6 flex flex-wrap items-start gap-2 rounded-xl border border-zinc-200 bg-white p-4"
+            class="mt-6 space-y-4 rounded-xl border border-zinc-200 bg-white p-4"
             @submit.prevent="sendInvite"
         >
-            <div class="min-w-64 flex-1">
-                <label for="invite-email" class="sr-only">Email</label>
-                <input
-                    id="invite-email"
-                    v-model="invite.email"
-                    type="email"
-                    required
-                    placeholder="name@example.com"
-                    class="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
-                />
-                <p v-if="invite.errors.email" class="mt-1 text-xs text-red-600">
-                    {{ invite.errors.email }}
-                </p>
+            <div class="flex flex-wrap items-start gap-2">
+                <div class="min-w-64 flex-1">
+                    <label for="invite-email" class="sr-only">Email</label>
+                    <input
+                        id="invite-email"
+                        v-model="invite.email"
+                        type="email"
+                        required
+                        placeholder="name@example.com"
+                        class="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
+                    />
+                    <p
+                        v-if="invite.errors.email"
+                        class="mt-1 text-xs text-red-600"
+                    >
+                        {{ invite.errors.email }}
+                    </p>
+                </div>
+                <button
+                    type="submit"
+                    :disabled="
+                        invite.processing || invite.role_ids.length === 0
+                    "
+                    class="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-50"
+                >
+                    Send invitation
+                </button>
             </div>
-            <label for="invite-role" class="sr-only">Role</label>
-            <select
-                id="invite-role"
-                v-model="invite.role_id"
-                class="rounded-lg border border-zinc-300 px-3 py-2 text-sm"
-            >
-                <option v-for="role in roles" :key="role.id" :value="role.id">
-                    {{ role.name }}
-                </option>
-            </select>
-            <button
-                type="submit"
-                :disabled="invite.processing"
-                class="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-50"
-            >
-                Send invitation
-            </button>
-            <p v-if="invite.errors.role_id" class="w-full text-xs text-red-600">
-                {{ invite.errors.role_id }}
-            </p>
+
+            <fieldset>
+                <legend class="text-xs font-medium text-zinc-500">Roles</legend>
+                <div class="mt-1.5 flex flex-wrap gap-2">
+                    <label
+                        v-for="role in grantable.roles"
+                        :key="role.id"
+                        class="flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1 text-sm"
+                        :class="
+                            invite.role_ids.includes(role.id)
+                                ? 'border-zinc-900 bg-zinc-900 text-white'
+                                : 'border-zinc-300 hover:border-zinc-500'
+                        "
+                    >
+                        <input
+                            v-model="invite.role_ids"
+                            type="checkbox"
+                            :value="role.id"
+                            class="sr-only"
+                        />
+                        {{ role.name }}
+                    </label>
+                </div>
+                <p
+                    v-if="invite.errors.role_ids"
+                    class="mt-1 text-xs text-red-600"
+                >
+                    {{ invite.errors.role_ids }}
+                </p>
+            </fieldset>
+
+            <div>
+                <button
+                    type="button"
+                    class="text-xs font-medium text-zinc-600 hover:text-zinc-900"
+                    :aria-expanded="showExtraPermissions"
+                    @click="showExtraPermissions = !showExtraPermissions"
+                >
+                    {{ showExtraPermissions ? '− Hide' : '+ Add' }} extra
+                    permissions
+                </button>
+                <fieldset v-if="showExtraPermissions" class="mt-2">
+                    <legend class="sr-only">Extra permissions</legend>
+                    <p class="text-xs text-zinc-500">
+                        Granted on top of the roles. You can only grant
+                        permissions you have.
+                    </p>
+                    <div class="mt-2 grid gap-1.5 sm:grid-cols-2">
+                        <label
+                            v-for="permission in grantable.permissions"
+                            :key="permission.value"
+                            class="flex items-center gap-2 text-sm"
+                        >
+                            <input
+                                v-model="invite.permissions"
+                                type="checkbox"
+                                :value="permission.value"
+                            />
+                            {{ permission.label }}
+                        </label>
+                    </div>
+                    <p
+                        v-if="invite.errors.permissions"
+                        class="mt-1 text-xs text-red-600"
+                    >
+                        {{ invite.errors.permissions }}
+                    </p>
+                </fieldset>
+            </div>
         </form>
 
         <ul
@@ -178,6 +254,27 @@ function expiresIn(date: string): string {
                         >
                     </p>
                     <p class="text-xs text-zinc-500">{{ member.email }}</p>
+                    <p
+                        v-if="
+                            member.roles.length > 1 || member.permissions.length
+                        "
+                        class="mt-0.5 text-xs text-zinc-500"
+                    >
+                        <template v-if="member.roles.length > 1">
+                            Roles: {{ member.roles.join(', ') }}
+                        </template>
+                        <template
+                            v-if="
+                                member.roles.length > 1 &&
+                                member.permissions.length
+                            "
+                        >
+                            ·
+                        </template>
+                        <template v-if="member.permissions.length">
+                            Also: {{ member.permissions.join(', ') }}
+                        </template>
+                    </p>
                 </div>
                 <div class="flex items-center gap-3 text-sm">
                     <select
@@ -225,8 +322,11 @@ function expiresIn(date: string): string {
                     <div>
                         <p class="font-medium">{{ invitation.email }}</p>
                         <p class="text-xs text-zinc-500">
-                            {{ invitation.role?.name }} ·
-                            {{ expiresIn(invitation.expires_at) }}
+                            {{ invitation.roles.join(', ') }}
+                            <template v-if="invitation.permissions.length">
+                                + {{ invitation.permissions.join(', ') }}
+                            </template>
+                            · {{ expiresIn(invitation.expires_at) }}
                         </p>
                     </div>
                     <div class="flex items-center gap-3">

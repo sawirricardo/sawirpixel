@@ -13,4 +13,17 @@ enum Permission: string
     case RemoveMembers = 'members.remove';
     case ManageRoles = 'roles.manage';
     case CreateGenerations = 'generations.create';
+
+    public function label(): string
+    {
+        return match ($this) {
+            self::UpdateOrganization => 'Update the organization',
+            self::DeleteOrganization => 'Delete the organization',
+            self::ViewMembers => 'View members',
+            self::InviteMembers => 'Invite members',
+            self::RemoveMembers => 'Remove members',
+            self::ManageRoles => 'Change member roles',
+            self::CreateGenerations => 'Generate images',
+        };
+    }
 }

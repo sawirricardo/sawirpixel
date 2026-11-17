@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Models\OrgInvitation;
 use App\Models\OrgUser;
 use App\Models\PersonalAccessToken;
 use App\Models\Role;
@@ -80,6 +81,7 @@ final class AppServiceProvider extends ServiceProvider
             'user' => User::class,
             'org_user' => OrgUser::class,
             'role' => Role::class,
+            'org_invitation' => OrgInvitation::class,
         ]);
 
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
