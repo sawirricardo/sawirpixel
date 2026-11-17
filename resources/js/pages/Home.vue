@@ -8,11 +8,10 @@ import {
     ref,
     watch,
 } from 'vue';
-import AccessDialog from '@/components/AccessDialog.vue';
-import type { AccessStep } from '@/components/AccessDialog.vue';
 import PillMenu from '@/components/PillMenu.vue';
 import type { PillOption } from '@/components/PillMenu.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
+import { useAccessDialog } from '@/lib/accessDialog';
 import { formatMoneyRange } from '@/lib/money';
 import type { CostEstimate, SharedProps } from '@/types';
 
@@ -65,35 +64,27 @@ const textarea = ref<HTMLTextAreaElement | null>(null);
 const showReferenceInput = ref(false);
 const referenceDraft = ref('');
 const referenceDraftError = ref<string | null>(null);
-const accessOpen = ref(false);
-const accessStep = ref<AccessStep>('login');
+const access = useAccessDialog();
 const noPermission = ref(false);
 const readyMessage = ref<string | null>(null);
 
 /**
- * The access dialog keeps this page's state across its form posts, so once the user is logged in
- * and has an organization the props update here: move to the next step, or close and let them send.
+ * When the access dialog that a blocked "send" opened closes, say whether the user can now generate.
  */
-watch(
-    () =>
-        [auth.value.user, auth.value.organization, props.canGenerate] as const,
-    ([user, organization, canGenerate]) => {
-        if (!accessOpen.value) {
-            return;
-        }
+watch(access.open, (isOpen) => {
+    if (isOpen || access.purpose.value !== 'generate') {
+        return;
+    }
 
-        if (canGenerate) {
-            accessOpen.value = false;
-            readyMessage.value = "You're all set. Press send to generate.";
-            void nextTick(() => textarea.value?.focus());
-        } else if (user && !organization) {
-            accessStep.value = 'organization';
-        } else if (user) {
-            accessOpen.value = false;
-            noPermission.value = true;
-        }
-    },
-);
+    access.purpose.value = null;
+
+    if (props.canGenerate) {
+        readyMessage.value = "You're all set. Press send to generate.";
+        void nextTick(() => textarea.value?.focus());
+    } else if (auth.value.user && auth.value.organization) {
+        noPermission.value = true;
+    }
+});
 
 function autoGrow(): void {
     const element = textarea.value;
@@ -175,6 +166,34 @@ watch(
 
 onBeforeUnmount(() => clearTimeout(debounce));
 
+/**
+ * "/" jumps to the prompt from anywhere on the page, unless the user is already typing somewhere.
+ */
+function focusPromptShortcut(event: KeyboardEvent): void {
+    const target = event.target as HTMLElement | null;
+    const isTyping =
+        target?.isContentEditable ||
+        ['INPUT', 'TEXTAREA', 'SELECT'].includes(target?.tagName ?? '');
+
+    if (
+        event.key !== '/' ||
+        isTyping ||
+        event.metaKey ||
+        event.ctrlKey ||
+        access.open.value
+    ) {
+        return;
+    }
+
+    event.preventDefault();
+    textarea.value?.focus();
+}
+
+onMounted(() => document.addEventListener('keydown', focusPromptShortcut));
+onBeforeUnmount(() =>
+    document.removeEventListener('keydown', focusPromptShortcut),
+);
+
 const canAddReference = computed(
     () => form.reference_images.length < props.maxReferenceImages,
 );
@@ -200,6 +219,22 @@ function addReference(): void {
     showReferenceInput.value = false;
     textarea.value?.focus();
 }
+
+/**
+ * Abandon the URL being typed: close the field and forget the draft.
+ */
+function cancelReference(): void {
+    referenceDraft.value = '';
+    referenceDraftError.value = null;
+    showReferenceInput.value = false;
+    textarea.value?.focus();
+}
+
+const draftPreviewUrl = computed(() => {
+    const url = referenceDraft.value.trim();
+
+    return /^https?:\/\/\S+$/i.test(url) ? url : null;
+});
 
 function removeReference(index: number): void {
     form.reference_images.splice(index, 1);
@@ -241,8 +276,9 @@ function submit(): void {
         if (auth.value.user && auth.value.organization) {
             noPermission.value = true;
         } else {
-            accessStep.value = auth.value.user ? 'organization' : 'login';
-            accessOpen.value = true;
+            access.show(auth.value.user ? 'organization' : 'login', {
+                purpose: 'generate',
+            });
         }
 
         return;
@@ -307,7 +343,8 @@ function onKeydown(event: KeyboardEvent): void {
                         </span>
                         <button
                             type="button"
-                            class="rounded-full p-1 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-700"
+                            class="rounded-full bg-zinc-200/70 p-1 text-zinc-600 hover:bg-zinc-300 hover:text-zinc-900"
+                            title="Remove this reference image"
                             :aria-label="`Remove reference image ${index + 1}`"
                             @click="removeReference(index)"
                         >
@@ -339,7 +376,23 @@ function onKeydown(event: KeyboardEvent): void {
                 />
 
                 <div v-if="showReferenceInput" class="px-4 pb-2">
-                    <div class="flex gap-2">
+                    <div class="flex items-center gap-2">
+                        <img
+                            v-if="draftPreviewUrl"
+                            :src="draftPreviewUrl"
+                            alt="Preview of the image URL"
+                            class="size-9 shrink-0 rounded-lg bg-zinc-100 object-cover"
+                            @error="
+                                (
+                                    $event.target as HTMLImageElement
+                                ).style.visibility = 'hidden'
+                            "
+                            @load="
+                                (
+                                    $event.target as HTMLImageElement
+                                ).style.visibility = 'visible'
+                            "
+                        />
                         <input
                             v-model="referenceDraft"
                             type="url"
@@ -347,7 +400,7 @@ function onKeydown(event: KeyboardEvent): void {
                             placeholder="Paste an image URL (https://…)"
                             class="w-full rounded-xl border border-zinc-200 px-3 py-1.5 text-sm focus:border-zinc-400 focus:outline-none"
                             @keydown.enter.prevent="addReference"
-                            @keydown.escape="showReferenceInput = false"
+                            @keydown.escape="cancelReference"
                         />
                         <button
                             type="button"
@@ -355,6 +408,19 @@ function onKeydown(event: KeyboardEvent): void {
                             @click="addReference"
                         >
                             Add
+                            <kbd class="ml-1 font-sans text-xs opacity-60"
+                                >↵</kbd
+                            >
+                        </button>
+                        <button
+                            type="button"
+                            class="rounded-xl border border-zinc-200 px-3 text-sm font-medium text-zinc-700 hover:bg-zinc-100"
+                            @click="cancelReference"
+                        >
+                            Cancel
+                            <kbd class="ml-1 font-sans text-xs opacity-60"
+                                >Esc</kbd
+                            >
                         </button>
                     </div>
                     <p
@@ -376,7 +442,11 @@ function onKeydown(event: KeyboardEvent): void {
                                 : `Up to ${maxReferenceImages} reference images`
                         "
                         aria-label="Add a reference image URL"
-                        @click="showReferenceInput = !showReferenceInput"
+                        @click="
+                            showReferenceInput
+                                ? cancelReference()
+                                : (showReferenceInput = true)
+                        "
                     >
                         <svg
                             class="size-4"
@@ -503,11 +573,15 @@ function onKeydown(event: KeyboardEvent): void {
             </p>
 
             <p class="mt-4 text-center text-xs text-zinc-400">
+                <kbd class="font-sans text-zinc-500">↵</kbd> to generate ·
+                <kbd class="font-sans text-zinc-500">Shift ↵</kbd> for a new
+                line · <kbd class="font-sans text-zinc-500">/</kbd> to jump to
+                the prompt
+            </p>
+            <p class="mt-1 text-center text-xs text-zinc-400">
                 The price is an estimate: it's set once the image is finished,
                 and failed generations are free.
             </p>
         </div>
-
-        <AccessDialog v-model:open="accessOpen" v-model:step="accessStep" />
     </AppLayout>
 </template>

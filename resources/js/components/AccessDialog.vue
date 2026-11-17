@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useForm } from '@inertiajs/vue3';
-import { nextTick, ref, watch } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
+import { useAccessDialog } from '@/lib/accessDialog';
 
 export type AccessStep = 'login' | 'register' | 'organization';
 
@@ -8,6 +9,9 @@ const open = defineModel<boolean>('open', { required: true });
 const step = defineModel<AccessStep>('step', { required: true });
 
 const dialog = ref<HTMLDialogElement | null>(null);
+
+const { purpose } = useAccessDialog();
+const forGenerating = computed(() => purpose.value === 'generate');
 
 const visitOptions = { preserveState: true, preserveScroll: true } as const;
 
@@ -133,13 +137,10 @@ const primaryClass =
 
             <template v-else>
                 <h2 id="access-dialog-title" class="text-lg font-semibold">
-                    {{
-                        step === 'login'
-                            ? 'Log in to generate'
-                            : 'Create an account to generate'
-                    }}
+                    {{ step === 'login' ? 'Log in' : 'Create an account'
+                    }}{{ forGenerating ? ' to generate' : '' }}
                 </h2>
-                <p class="mt-1 text-sm text-zinc-600">
+                <p v-if="forGenerating" class="mt-1 text-sm text-zinc-600">
                     Your prompt will be waiting when you're done.
                 </p>
 

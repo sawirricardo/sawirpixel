@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
+import { Head, useForm, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
 import AppLayout from '@/layouts/AppLayout.vue';
+import { useAccessDialog } from '@/lib/accessDialog';
 import type { SharedProps } from '@/types';
 
 const props = defineProps<{
@@ -17,6 +18,7 @@ const props = defineProps<{
 }>();
 
 const page = usePage<SharedProps>();
+const access = useAccessDialog();
 const user = computed(() => page.props.auth.user);
 
 const form = useForm({});
@@ -68,18 +70,20 @@ const errors = computed(
                 </p>
 
                 <div v-if="!user" class="mt-6 flex gap-3">
-                    <Link
-                        href="/login"
+                    <button
+                        type="button"
                         class="flex-1 rounded-full bg-zinc-900 px-4 py-2 text-center text-sm font-medium text-white hover:bg-zinc-700"
+                        @click="access.show('login', { onboarding: false })"
                     >
                         Log in to accept
-                    </Link>
-                    <Link
-                        href="/register"
+                    </button>
+                    <button
+                        type="button"
                         class="flex-1 rounded-full border border-zinc-300 px-4 py-2 text-center text-sm font-medium hover:bg-zinc-50"
+                        @click="access.show('register', { onboarding: false })"
                     >
                         Create account
-                    </Link>
+                    </button>
                 </div>
 
                 <p

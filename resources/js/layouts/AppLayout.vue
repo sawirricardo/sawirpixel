@@ -1,11 +1,34 @@
 <script setup lang="ts">
 import { Link, usePage } from '@inertiajs/vue3';
-import { computed } from 'vue';
+import { computed, watch } from 'vue';
+import AccessDialog from '@/components/AccessDialog.vue';
 import OrganizationSwitcher from '@/components/OrganizationSwitcher.vue';
+import { useAccessDialog } from '@/lib/accessDialog';
 import type { SharedProps } from '@/types';
 
 const page = usePage<SharedProps>();
 const auth = computed(() => page.props.auth);
+const access = useAccessDialog();
+
+/**
+ * The dialog's forms keep the current page mounted, so the shared auth props change underneath it:
+ * once someone is logged in, continue to creating an organization if they need one, otherwise close.
+ */
+watch(
+    () => [auth.value.user, auth.value.organization] as const,
+    ([user, organization]) => {
+        if (!access.open.value || !user) {
+            return;
+        }
+
+        if (!organization && access.onboarding.value) {
+            access.step.value = 'organization';
+        } else {
+            access.open.value = false;
+        }
+    },
+);
+
 const success = computed(() => {
     const message = page.flash.success;
 
@@ -57,18 +80,20 @@ const success = computed(() => {
                         </Link>
                     </template>
                     <template v-else>
-                        <Link
-                            href="/login"
+                        <button
+                            type="button"
                             class="text-zinc-600 hover:text-zinc-900"
+                            @click="access.show('login')"
                         >
                             Log in
-                        </Link>
-                        <Link
-                            href="/register"
+                        </button>
+                        <button
+                            type="button"
                             class="rounded-md bg-zinc-900 px-3 py-1.5 font-medium text-white hover:bg-zinc-700"
+                            @click="access.show('register')"
                         >
                             Create account
-                        </Link>
+                        </button>
                     </template>
                 </div>
             </nav>
@@ -83,5 +108,10 @@ const success = computed(() => {
             </p>
             <slot />
         </main>
+
+        <AccessDialog
+            v-model:open="access.open.value"
+            v-model:step="access.step.value"
+        />
     </div>
 </template>
