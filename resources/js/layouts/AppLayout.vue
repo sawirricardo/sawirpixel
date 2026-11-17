@@ -3,6 +3,7 @@ import { Link, router, usePage, usePoll } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
 import AccessDialog from '@/components/AccessDialog.vue';
 import BuyCreditsDialog from '@/components/BuyCreditsDialog.vue';
+import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import HistorySidebar from '@/components/HistorySidebar.vue';
 import NotificationBell from '@/components/NotificationBell.vue';
 import OrganizationSwitcher from '@/components/OrganizationSwitcher.vue';
@@ -12,6 +13,23 @@ import type { SharedProps } from '@/types';
 
 const page = usePage<SharedProps>();
 const auth = computed(() => page.props.auth);
+
+const confirmingLogout = ref(false);
+const loggingOut = ref(false);
+
+function logOut(): void {
+    router.post(
+        '/logout',
+        {},
+        {
+            onStart: () => (loggingOut.value = true),
+            onFinish: () => {
+                loggingOut.value = false;
+                confirmingLogout.value = false;
+            },
+        },
+    );
+}
 
 /**
  * Picks up finished images, invitations and low-credit alerts on whatever page is open. Inertia slows
@@ -185,14 +203,13 @@ const success = computed(() => {
                             >
                                 {{ auth.user.name }}
                             </Link>
-                            <Link
-                                href="/logout"
-                                method="post"
-                                as="button"
+                            <button
+                                type="button"
                                 class="text-zinc-600 hover:text-zinc-900"
+                                @click="confirmingLogout = true"
                             >
                                 Log out
-                            </Link>
+                            </button>
                         </template>
                         <template v-else>
                             <button
@@ -248,6 +265,14 @@ const success = computed(() => {
         </div>
 
         <BuyCreditsDialog v-model:open="creditsDialog.open.value" />
+        <ConfirmDialog
+            v-model:open="confirmingLogout"
+            title="Log out?"
+            body="Images in progress keep generating; you'll find them in your history when you're back."
+            confirm-label="Log out"
+            :processing="loggingOut"
+            @confirm="logOut"
+        />
         <AccessDialog
             v-model:open="access.open.value"
             v-model:step="access.step.value"
