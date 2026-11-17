@@ -150,3 +150,24 @@ test('lists only its own memberships for a user and an organization', function (
     expect($user->orgUsers()->pluck('id')->all())->toBe([$membership->id]);
     expect($organization->orgUsers()->pluck('id')->all())->toBe([$membership->id]);
 });
+
+test('replaces every role when roles are synced', function (): void {
+    $organization = Organization::factory()->create();
+    $orgUser = OrgUser::factory()->for($organization)->create();
+    $viewer = Role::factory()->for($organization)->create();
+    $editor = Role::factory()->for($organization)->create();
+    $orgUser->assignRole($viewer);
+
+    $orgUser->syncRoles($editor);
+
+    expect($orgUser->roles()->pluck('roles.id')->all())->toBe([$editor->id]);
+});
+
+test('refuses to sync a role defined by another organization', function (): void {
+    $orgUser = OrgUser::factory()->create();
+    $own = Role::factory()->for($orgUser->organization)->create();
+    $orgUser->assignRole($own);
+
+    expect(fn () => $orgUser->syncRoles(Role::factory()->create()))->toThrow(InvalidArgumentException::class);
+    expect($orgUser->roles()->pluck('roles.id')->all())->toBe([$own->id]);
+});

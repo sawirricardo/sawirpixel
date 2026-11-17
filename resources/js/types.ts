@@ -10,6 +10,8 @@ export type SharedProps = {
     auth: {
         user: AuthUser | null;
         organization: { id: number; name: string } | null;
+        organizations: { id: number; name: string }[];
+        canViewMembers: boolean;
     };
 };
 

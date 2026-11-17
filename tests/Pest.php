@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Actions\CreateOrganization;
+use App\Enums\DefaultRole;
+use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -105,6 +107,21 @@ function organizationOwner(): User
     $user = User::factory()->create();
 
     resolve(CreateOrganization::class)->handle($user, 'Acme Studio');
+
+    return $user->refresh();
+}
+
+/**
+ * Add a user to an organization with one of its default roles, and make it their current organization.
+ */
+function addMember(Organization $organization, DefaultRole $role, ?User $user = null): User
+{
+    $user ??= User::factory()->create();
+
+    $organization->orgUsers()->create(['user_id' => $user->id])->assignRole(
+        $organization->roles()->where('name', $role->value)->sole(),
+    );
+    $user->currentOrganization()->associate($organization)->save();
 
     return $user->refresh();
 }

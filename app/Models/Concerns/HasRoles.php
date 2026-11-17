@@ -48,6 +48,24 @@ trait HasRoles
         );
     }
 
+    /**
+     * Replace all of this model's roles with the given ones.
+     *
+     * @throws InvalidArgumentException when a role cannot be assigned to this model
+     */
+    public function syncRoles(Role ...$roles): void
+    {
+        foreach ($roles as $role) {
+            throw_unless(
+                $this->canBeAssignedRole($role),
+                InvalidArgumentException::class,
+                sprintf('Role [%d] cannot be assigned to this [%s].', $role->id, $this->getMorphClass()),
+            );
+        }
+
+        $this->roles()->sync(array_map(fn (Role $role): int => $role->id, $roles));
+    }
+
     public function removeRole(Role ...$roles): void
     {
         $this->roles()->detach(

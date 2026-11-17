@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
+use App\Models\OrgUser;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Inertia\Middleware;
 
 final class HandleInertiaRequests extends Middleware
@@ -40,6 +42,18 @@ final class HandleInertiaRequests extends Middleware
                     'id' => $user->currentOrganization->id,
                     'name' => $user->currentOrganization->name,
                 ] : null,
+                'organizations' => fn (): array => $user instanceof User ? $user->orgUsers()
+                    ->with('organization:id,name')
+                    ->get()
+                    ->map(fn (OrgUser $membership): array => [
+                        'id' => $membership->organization_id,
+                        'name' => $membership->organization->name ?? '',
+                    ])
+                    ->sortBy('name')
+                    ->values()
+                    ->all() : [],
+                'canViewMembers' => fn (): bool => $user instanceof User && $user->currentOrganization !== null
+                    && Gate::forUser($user)->allows('viewMembers', $user->currentOrganization),
             ],
         ];
     }

@@ -35,7 +35,9 @@ test('lets an organization owner submit', function (): void {
         ->where('canGenerate', true)
         ->where('auth.user.email', $user->email)
         ->where('auth.user.is_super_admin', false)
-        ->where('auth.organization.name', 'Acme Studio'));
+        ->where('auth.organization.name', 'Acme Studio')
+        ->where('auth.organizations', [['id' => $user->current_organization_id, 'name' => 'Acme Studio']])
+        ->where('auth.canViewMembers', true));
 });
 
 test('does not let a member without the generate permission submit', function (): void {

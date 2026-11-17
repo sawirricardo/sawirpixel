@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Link, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
+import OrganizationSwitcher from '@/components/OrganizationSwitcher.vue';
 import type { SharedProps } from '@/types';
 
 const page = usePage<SharedProps>();
@@ -39,9 +40,12 @@ const success = computed(() => {
                 </div>
                 <div class="flex items-center gap-4 text-sm">
                     <template v-if="auth.user">
-                        <span v-if="auth.organization" class="text-zinc-500">
-                            {{ auth.organization.name }}
-                        </span>
+                        <OrganizationSwitcher
+                            v-if="auth.organization"
+                            :current="auth.organization"
+                            :organizations="auth.organizations"
+                            :can-view-members="auth.canViewMembers"
+                        />
                         <span class="font-medium">{{ auth.user.name }}</span>
                         <Link
                             href="/logout"
