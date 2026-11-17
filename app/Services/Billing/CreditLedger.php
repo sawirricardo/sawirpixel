@@ -86,7 +86,8 @@ final readonly class CreditLedger
      */
     public function lockOrganization(int $organizationId): Organization
     {
-        return Organization::query()->whereKey($organizationId)->lockForUpdate()->sole();
+        // withTrashed: a late result for a deleted organization's generation must still settle.
+        return Organization::withTrashed()->whereKey($organizationId)->lockForUpdate()->sole();
     }
 
     /**

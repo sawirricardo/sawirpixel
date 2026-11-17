@@ -59,6 +59,7 @@ Route::middleware('auth')->group(function (): void {
 
     Route::get('/organization/settings', [OrganizationSettingsController::class, 'edit'])->name('organization.settings');
     Route::patch('/organization/settings', [OrganizationSettingsController::class, 'update'])->name('organization.update');
+    Route::delete('/organization/settings', [OrganizationSettingsController::class, 'destroy'])->name('organization.destroy');
     Route::redirect('/organization/members', '/organization/settings')->name('members.index');
     Route::patch('/organization/members/{member}', [MemberController::class, 'update'])->name('members.update');
     Route::delete('/organization/members/{member}', [MemberController::class, 'destroy'])->name('members.destroy');

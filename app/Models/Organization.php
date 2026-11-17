@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
  * @property-read int $id
@@ -21,6 +22,8 @@ final class Organization extends Model
 {
     /** @use HasFactory<OrganizationFactory> */
     use HasFactory;
+
+    use SoftDeletes;
 
     /**
      * Mirrors the column default so a new organization starts with no credits.

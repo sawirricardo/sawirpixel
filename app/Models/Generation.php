@@ -64,7 +64,8 @@ final class Generation extends Model
      */
     public function organization(): BelongsTo
     {
-        return $this->belongsTo(Organization::class);
+        // Generations outlive a deleted organization as billing records.
+        return $this->belongsTo(Organization::class)->withTrashed();
     }
 
     /**

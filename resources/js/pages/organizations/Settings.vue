@@ -2,12 +2,16 @@
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 import AppLayout from '@/layouts/AppLayout.vue';
+import type { Money } from '@/types';
 
 type RoleOption = { id: number; name: string };
 
 const props = defineProps<{
     organization: { id: number; name: string };
     canUpdate: boolean;
+    canDelete: boolean;
+    creditBalance: Money;
+    hasCredits: boolean;
     members: {
         id: number;
         name: string;
@@ -48,6 +52,12 @@ const invite = useForm({
 const showExtraPermissions = ref(false);
 
 const general = useForm({ name: props.organization.name });
+
+const removal = useForm({ confirm_name: '' });
+
+function deleteOrganization(): void {
+    removal.delete('/organization/settings', { preserveScroll: true });
+}
 
 function saveGeneral(): void {
     general.patch('/organization/settings', { preserveScroll: true });
@@ -402,5 +412,66 @@ function expiresIn(date: string): string {
                 </li>
             </ul>
         </template>
+
+        <section
+            v-if="canDelete"
+            class="mt-12 rounded-xl border border-red-200 bg-white p-4"
+            aria-labelledby="danger-heading"
+        >
+            <h2 id="danger-heading" class="text-sm font-semibold text-red-700">
+                Delete organization
+            </h2>
+            <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-zinc-600">
+                <li>
+                    Every member loses access, and pending invitations stop
+                    working.
+                </li>
+                <li v-if="hasCredits">
+                    The remaining {{ creditBalance.formatted }} in credits is
+                    forfeited.
+                </li>
+                <li>
+                    Images and billing records are kept for our records but are
+                    no longer visible to anyone.
+                </li>
+            </ul>
+            <form
+                class="mt-4 flex flex-wrap items-start gap-2"
+                @submit.prevent="deleteOrganization"
+            >
+                <div class="min-w-64 flex-1">
+                    <label for="confirm-name" class="text-xs text-zinc-500">
+                        Type
+                        <strong class="text-zinc-800">{{
+                            organization.name
+                        }}</strong>
+                        to confirm
+                    </label>
+                    <input
+                        id="confirm-name"
+                        v-model="removal.confirm_name"
+                        type="text"
+                        autocomplete="off"
+                        class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
+                    />
+                    <p
+                        v-if="removal.errors.confirm_name"
+                        class="mt-1 text-xs text-red-600"
+                    >
+                        {{ removal.errors.confirm_name }}
+                    </p>
+                </div>
+                <button
+                    type="submit"
+                    :disabled="
+                        removal.processing ||
+                        removal.confirm_name !== organization.name
+                    "
+                    class="mt-5 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-40"
+                >
+                    Delete organization
+                </button>
+            </form>
+        </section>
     </AppLayout>
 </template>

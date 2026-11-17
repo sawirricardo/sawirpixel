@@ -19,6 +19,11 @@ final class OrganizationPolicy
         return $this->allows($user, $organization, Permission::UpdateOrganization);
     }
 
+    public function delete(User $user, Organization $organization): bool
+    {
+        return $this->allows($user, $organization, Permission::DeleteOrganization);
+    }
+
     public function viewMembers(User $user, Organization $organization): bool
     {
         return $this->allows($user, $organization, Permission::ViewMembers);
