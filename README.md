@@ -1,58 +1,187 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Sawirpixel
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Image generation for teams, built on the [Pixelforge](https://pixelforge.promptedit.dev) API for the
+PromptEdit Senior Product Engineer assessment. Signed-in users write a prompt, see what it will cost
+before they submit, and get charged what it actually cost (Pixelforge's cost plus a 25% markup), or
+nothing if it fails. Operators get a profit report reconciled against Pixelforge's usage API.
 
-## About Laravel
+> **This is a demo.** Credit purchases are simulated; no real payments are taken.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+**Stack:** Laravel 13 · PHP 8.5 · Inertia v3 + Vue 3 (TypeScript) · Tailwind v4 · Redis + Horizon · Pest
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+---
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## Reviewer guide
 
-## Learning Laravel
+### 1. Run it (about 5 minutes)
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
-
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+Requirements: PHP 8.5, Composer, pnpm, and Redis (`docker run -d -p 6379:6379 redis` works).
 
 ```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+composer setup                  # install, .env, app key, SQLite database, migrations, front-end build
+php artisan db:seed             # permissions, and test@example.com / password (verified)
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+Then set these in `.env`:
 
-## Contributing
+| Variable | Why |
+|---|---|
+| `PIXELFORGE_API_KEY` | Required to generate. |
+| `PIXELFORGE_WEBHOOK_SECRET` | Verifies webhooks. Optional locally: polling works without them (see below). |
+| `APP_ADMINS=test@example.com` | Comma-separated emails that can open `/admin/*` (profit report, users, Horizon). |
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+Start everything:
 
-## Code of Conduct
+```bash
+php artisan dev                 # web server, Horizon (queues), Vite, and logs
+php artisan schedule:work       # second terminal: the 5-minute reconciliation job
+```
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+Open http://localhost:8000. Emails (verification, password reset, invitations) go to
+`storage/logs/laravel.log` with the default `MAIL_MAILER=log`.
 
-## Security Vulnerabilities
+**Webhooks are optional for a local review.** Every submitted generation is also polled every 10
+seconds, and a scheduled job re-checks anything stale every 5 minutes, so images finish either way.
+To receive real webhooks, expose the app (for example `cloudflared tunnel --url http://localhost:8000`)
+and set `https://<tunnel>/webhooks/pixelforge` as the endpoint in Pixelforge's dashboard.
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+### 2. A 10-minute walkthrough
 
-## License
+Pixelforge's test directives make each scenario deterministic: put one at the start of a prompt.
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+| Directive | Effect |
+|---|---|
+| `[succeed]` | Never fails at random |
+| `[fail]` | Fails during processing (not billed) |
+| `[blocked]` | Rejected at submission: `400 content_policy_violation` |
+| `[overloaded]` | Rejected at submission: `503 overloaded` (retried) |
+| `[slow]` | Takes 60–90 seconds instead of 5–30 |
+| `[duplicate]` | Every webhook event is delivered twice |
+
+1. **Estimate before submitting.** As a guest, type a prompt on the home page and change size,
+   quality, or add a reference image URL: the price range updates live. Press send to get the log-in
+   dialog; your prompt is kept.
+2. **Onboarding.** Log in as `test@example.com` / `password`, create an organization when asked, and
+   buy credits from the balance chip in the header (simulated).
+3. **Generate.** Send `[succeed] A lighthouse at dusk`. The page polls until it finishes, then shows
+   the image, its estimated range, and the exact charge (hover the charge for full precision).
+4. **Failures cost nothing.** Try `[fail] …`, `[blocked] …` and `[overloaded] …`. Each ends with a
+   clear message and the credits set aside for it are returned. See *Failure modes* below.
+5. **Threads.** On a finished image, describe a change ("make it stormier"). Use *Continue from here*
+   on an older version to branch, then switch branches with `‹ 1/2 ›` or the versions map.
+6. **History and credits.** The sidebar lists threads; `/generations` lists everything; `/credits` is
+   the organization's ledger (purchases, amounts set aside and returned, charges).
+7. **Operators.** As an `APP_ADMINS` user, open **Profit report** (`/admin/reports/profit`): revenue,
+   Pixelforge cost and margin per day, reconciled against `GET /v1/usage`, with a CSV export. **Users**
+   (`/admin/users`) shows every account's spend and balances. Horizon is at `/admin/horizon`.
+8. **Teams.** In organization settings: invite members with roles, set spending and image limits,
+   restrict qualities or sizes for members, or delete the organization.
+
+---
+
+## How the requirements are met
+
+### Pricing
+
+- Rates and token tables come from Pixelforge's `GET /v1/pricing` (cached for an hour), not hard-coded.
+- The estimate turns the prompt length, size, quality and reference images into a token range, prices
+  it, and adds the markup (`PIXELFORGE_MARKUP`, default `1.25`). See
+  `app/Services/Pricing/GenerationCostEstimator.php`.
+- The final charge uses the usage and rates Pixelforge reports for that generation, so it's exact.
+- All money is `brick/math` `BigDecimal`: provider costs to 9 decimal places (as Pixelforge reports
+  them), charges to 10. It's never a float, and never SQL arithmetic (SQLite would use floats). It's
+  rounded only for display.
+
+### Asynchronous generations
+
+- Submitting creates the generation and holds its maximum cost in one transaction, then queues
+  `SubmitGeneration`, which sends it with a stored idempotency key so a retry can't create a second
+  generation or a second bill.
+- Results arrive by **webhook** (HMAC-verified against the raw body, with replay protection by event
+  id) and by **polling** (`PollGeneration`, every 10 seconds). A scheduled `ReconcileGenerations` job
+  catches anything that's gone quiet. All three go through one idempotent action,
+  `ApplyPixelforgeGeneration`, so duplicates and out-of-order deliveries are harmless.
+
+### Failure modes
+
+| Situation | What happens |
+|---|---|
+| Content policy rejection | Failed at once with our own explanation; hold returned |
+| Pixelforge overloaded / rate-limited (429, 503) | Retried, honouring `Retry-After`, within a shared 55 requests/minute limiter |
+| At Pixelforge's concurrency limit (3 in flight) | Waits for a free slot instead of failing |
+| Daily limit reached | Failed with an explanation; hold returned |
+| Fails during processing | Marked failed when the result arrives; not charged |
+| Never accepted after an hour of retries | Failed; hold returned |
+| Duplicate, late or out-of-order webhooks | Ignored by the status machine (only forward moves apply) |
+| Webhook missed entirely | Found by polling or the 5-minute reconciliation |
+| Not enough credits, or over an organization limit | Refused before submitting, with the reason shown as you type |
+
+### History
+
+The sidebar shows one entry per thread. `/generations` has every image with its status, estimate,
+actual charge and when its image link expires. `/credits` is the full ledger.
+
+### Admin profit report
+
+`app/Services/Reporting/ProfitReport.php` sums revenue and our recorded Pixelforge cost per day, and
+compares each day with Pixelforge's `GET /v1/usage`, flagging any day that doesn't match.
+
+### Credits
+
+Each organization has a balance and an append-only ledger (`credit_transactions`): purchase, hold,
+hold release, charge. Unique indexes make each step happen at most once per generation, and the
+balance is only changed with the organization's row locked (`app/Services/Billing/CreditLedger.php`).
+
+---
+
+## Where to look
+
+| Area | Files |
+|---|---|
+| Pixelforge client and webhooks | `app/Services/Pixelforge/`, `app/Actions/HandlePixelforgeWebhook.php` |
+| Generation lifecycle | `app/Enums/GenerationStatus.php`, `app/Jobs/`, `app/Actions/ApplyPixelforgeGeneration.php` |
+| Pricing and money | `app/Services/Pricing/` |
+| Credits | `app/Services/Billing/` |
+| Limits | `app/Services/Generations/GenerationLimiter.php` |
+| Threads (continue and branch) | `app/Services/Generations/GenerationThread.php` |
+| Roles and permissions | `app/Models/Concerns/HasRoles.php`, `app/Enums/Permission.php`, `app/Policies/` |
+| Reporting | `app/Services/Reporting/` |
+| Front end | `resources/js/pages/`, `resources/js/lib/` |
+
+### State machines
+
+The lifecycles that drive behaviour are explicit, each with its diagram in a docblock:
+
+- **Generation status** (`app/Enums/GenerationStatus.php`): forward-only transitions, enforced on
+  save, with a test pinning the full transition table. Mirrored for the front end in
+  `resources/js/lib/generationStatus.ts`.
+- **Invitations** (`app/Enums/InvitationStatus.php`): pending, accepted or expired, derived from
+  `accepted_at` and `expires_at` so it can't go stale.
+- **What "send" does** (`resources/js/lib/composerState.ts`): from "needs an account" to "ready",
+  shared by both prompt boxes and handled with exhaustive switches.
+
+---
+
+## Tests and quality gates
+
+```bash
+php artisan test --compact      # 373 tests
+composer test                   # everything below, then the suite
+composer test:types             # PHPStan (Larastan, level max)
+composer test:type-coverage     # 100% type coverage
+composer test:lint              # Pint, Rector, vp fmt and vue-tsc
+composer test:unit              # the suite with a 100% line coverage gate
+```
+
+Architecture tests (`tests/Unit/ArchTest.php`) enforce Pest's strict and security presets: final
+classes, strict types, no protected methods, enums and exceptions in their own namespaces.
+
+## Design decisions
+
+- **Images aren't stored.** They load from Pixelforge's signed links, which expire after 24 hours;
+  the app shows when each one expires, and a version can only be continued while its link is valid.
+- **Hold the maximum, charge the actual.** Users never owe more than the estimate they saw.
+- **Usage is derived, not counted.** Limits and the reconciliation read the generations and the
+  ledger themselves, so a late failure or a replayed webhook can't leave a counter wrong.
+- **Customers don't see the provider's internals.** The estimate endpoint returns only the price, and
+  failure messages are our own wording. The provider's error code is kept for operators.
