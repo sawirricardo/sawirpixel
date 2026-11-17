@@ -29,8 +29,10 @@ final readonly class AcceptInvitation
             $invitation = OrgInvitation::query()->whereKey($invitation->id)->lockForUpdate()->sole();
             $organization = $invitation->organization()->sole();
 
-            if (! $invitation->isPending()) {
-                throw ValidationException::withMessages(['invitation' => 'This invitation has expired or was already used.']);
+            $refusal = $invitation->status()->refusal();
+
+            if ($refusal !== null) {
+                throw ValidationException::withMessages(['invitation' => $refusal]);
             }
 
             if (mb_strtolower($user->email) !== mb_strtolower($invitation->email)) {

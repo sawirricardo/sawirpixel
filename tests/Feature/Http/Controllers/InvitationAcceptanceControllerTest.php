@@ -39,16 +39,19 @@ test('refuses an invitation sent to a different address', function (): void {
     expect($invitation->refresh()->accepted_at)->toBeNull();
 });
 
-test('refuses an expired or already used invitation', function (string $state): void {
+test('refuses an expired or already used invitation, saying which', function (string $state, string $message): void {
     $invitation = OrgInvitation::factory()->{$state}()->withToken('secret')->create(['email' => 'grace@example.com']);
     $grace = User::factory()->create(['email' => 'grace@example.com']);
 
     $response = $this->actingAs($grace)->post(route('invitations.accept', 'secret'));
 
-    $response->assertSessionHasErrors(['invitation' => 'This invitation has expired or was already used.']);
+    $response->assertSessionHasErrors(['invitation' => $message]);
 
     expect($grace->membershipIn($invitation->organization))->toBeNull();
-})->with(['expired', 'accepted']);
+})->with([
+    'expired' => ['expired', 'This invitation has expired. Ask whoever invited you to send a new one.'],
+    'accepted' => ['accepted', 'This invitation has already been used.'],
+]);
 
 test('returns 404 for an unknown token', function (): void {
     $this->actingAs(User::factory()->create())->post(route('invitations.accept', 'nope'))->assertNotFound();
@@ -73,6 +76,7 @@ test('shows a guest the invitation and brings them back to it after logging in',
         ->where('invitation.email', 'grace@example.com')
         ->where('invitation.roles', ['Member'])
         ->where('invitation.permissions', [])
+        ->where('invitation.status', 'pending')
         ->where('invitation.is_pending', true)
         ->where('emailMatches', false));
     $login = $this->post(route('login'), ['email' => 'grace@example.com', 'password' => 'password']);
@@ -81,9 +85,11 @@ test('shows a guest the invitation and brings them back to it after logging in',
     $this->get(route('invitations.show', 'secret'))->assertInertia(fn (Assert $page): Assert => $page->where('emailMatches', true));
 });
 
-test('shows an unknown or expired invitation as not valid', function (): void {
+test('shows an expired, used or unknown invitation as such', function (): void {
     OrgInvitation::factory()->expired()->withToken('old')->create();
+    OrgInvitation::factory()->accepted()->withToken('used')->create();
 
-    $this->get(route('invitations.show', 'old'))->assertInertia(fn (Assert $page): Assert => $page->where('invitation.is_pending', false));
+    $this->get(route('invitations.show', 'old'))->assertInertia(fn (Assert $page): Assert => $page->where('invitation.status', 'expired')->where('invitation.is_pending', false));
+    $this->get(route('invitations.show', 'used'))->assertInertia(fn (Assert $page): Assert => $page->where('invitation.status', 'accepted'));
     $this->get(route('invitations.show', 'unknown'))->assertInertia(fn (Assert $page): Assert => $page->where('invitation', null));
 });

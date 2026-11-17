@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, useForm, usePage } from '@inertiajs/vue3';
+import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { useAccessDialog } from '@/lib/accessDialog';
@@ -13,6 +13,8 @@ const props = defineProps<{
         roles: string[];
         permissions: string[];
         inviter: string | null;
+        /** See App\Enums\InvitationStatus. A revoked or replaced invitation is gone: `invitation` is null. */
+        status: 'pending' | 'accepted' | 'expired';
         is_pending: boolean;
     } | null;
     emailMatches: boolean;
@@ -39,14 +41,49 @@ const errors = computed(
         <div
             class="mx-auto max-w-md rounded-2xl border border-zinc-200 bg-white p-6"
         >
-            <template v-if="!invitation || !invitation.is_pending">
+            <template v-if="!invitation">
                 <h1 class="text-xl font-semibold">
                     This invitation isn't valid
                 </h1>
                 <p class="mt-2 text-sm text-zinc-600">
-                    It may have expired, been revoked, or already been used. Ask
-                    whoever invited you to send a new one.
+                    It may have been revoked or replaced by a newer one, or the
+                    link may be incomplete. Ask whoever invited you to send a
+                    new one.
                 </p>
+            </template>
+
+            <template v-else-if="invitation.status === 'expired'">
+                <h1 class="text-xl font-semibold">
+                    This invitation has expired
+                </h1>
+                <p class="mt-2 text-sm text-zinc-600">
+                    The invitation to join {{ invitation.organization }} is no
+                    longer valid. Ask
+                    {{ invitation.inviter ?? 'whoever invited you' }} to send a
+                    new one.
+                </p>
+            </template>
+
+            <template v-else-if="invitation.status === 'accepted'">
+                <h1 class="text-xl font-semibold">
+                    This invitation has already been used
+                </h1>
+                <p class="mt-2 text-sm text-zinc-600">
+                    <template v-if="emailMatches">
+                        You've already joined {{ invitation.organization }}.
+                    </template>
+                    <template v-else>
+                        It was accepted already. If you need access to
+                        {{ invitation.organization }}, ask for a new invitation.
+                    </template>
+                </p>
+                <Link
+                    v-if="emailMatches"
+                    href="/"
+                    class="mt-6 block w-full rounded-full bg-zinc-900 px-4 py-2.5 text-center text-sm font-medium text-white hover:bg-zinc-700"
+                >
+                    Start generating
+                </Link>
             </template>
 
             <template v-else>

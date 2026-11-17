@@ -45,6 +45,14 @@ final class OrgInvitationFactory extends Factory
     }
 
     /**
+     * Indicate that the invitation can still be accepted (the default, named for readability).
+     */
+    public function pending(): static
+    {
+        return $this->state(fn (): array => ['accepted_at' => null, 'expires_at' => now()->addDays(OrgInvitation::EXPIRES_AFTER_DAYS)]);
+    }
+
+    /**
      * @param  list<DefaultRole>  $roles
      */
     public function withRoles(array $roles): static

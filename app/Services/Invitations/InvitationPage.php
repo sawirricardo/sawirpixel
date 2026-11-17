@@ -14,7 +14,7 @@ use App\Models\User;
 final class InvitationPage
 {
     /**
-     * @return array{acceptUrl: string, invitation: array{email: string, organization: string, roles: list<mixed>, permissions: list<string>, inviter: string|null, is_pending: bool}|null, emailMatches: bool}
+     * @return array{acceptUrl: string, invitation: array{email: string, organization: string, roles: list<mixed>, permissions: list<string>, inviter: string|null, status: string, is_pending: bool}|null, emailMatches: bool}
      */
     public static function props(?OrgInvitation $invitation, ?User $user, string $acceptUrl): array
     {
@@ -26,6 +26,7 @@ final class InvitationPage
                 'roles' => array_values($invitation->roles->pluck('name')->all()),
                 'permissions' => array_values($invitation->permissions->map(fn (Permission $permission): string => $permission->name->label())->all()),
                 'inviter' => $invitation->invitedBy?->name,
+                'status' => $invitation->status()->value,
                 'is_pending' => $invitation->isPending(),
             ] : null,
             'emailMatches' => $user instanceof User && $invitation instanceof OrgInvitation

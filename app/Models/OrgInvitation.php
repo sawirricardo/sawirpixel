@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\InvitationStatus;
 use App\Models\Concerns\HasRoles;
 use Carbon\CarbonInterface;
 use Database\Factories\OrgInvitationFactory;
@@ -83,8 +84,23 @@ final class OrgInvitation extends Model
         return $this->belongsTo(User::class, 'invited_by_id');
     }
 
+    /**
+     * Where it is in its lifecycle; see InvitationStatus.
+     */
+    public function status(): InvitationStatus
+    {
+        return match (true) {
+            $this->accepted_at !== null => InvitationStatus::Accepted,
+            ! $this->expires_at->isFuture() => InvitationStatus::Expired,
+            default => InvitationStatus::Pending,
+        };
+    }
+
+    /**
+     * Can still be accepted. Organization::pendingInvitations() is the same rule in SQL.
+     */
     public function isPending(): bool
     {
-        return $this->accepted_at === null && $this->expires_at->isFuture();
+        return $this->status() === InvitationStatus::Pending;
     }
 }
