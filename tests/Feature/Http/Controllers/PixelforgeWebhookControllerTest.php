@@ -11,6 +11,7 @@ use App\Models\PixelforgeWebhookEvent;
 use App\Services\Billing\CreditLedger;
 use Brick\Math\BigDecimal;
 use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Testing\TestResponse;
 
 beforeEach(function (): void {
@@ -141,9 +142,12 @@ test('acknowledges a ping without touching any generation', function (): void {
 test('rejects an event signed with the wrong secret', function (): void {
     $generation = Generation::factory()->queued()->create(['pixelforge_id' => 'gen_1']);
 
+    Log::spy();
+
     $response = deliverPixelforgeEvent('evt_1', 'generation.succeeded', pixelforgeGenerationPayload('succeeded'), 'whsec_forged');
 
     $response->assertBadRequest();
+    Log::shouldHaveReceived('warning')->with('Rejected a Pixelforge webhook: The Pixelforge webhook signature does not match the payload.', Mockery::type('array'));
 
     expect(PixelforgeWebhookEvent::query()->count())->toBe(0);
     expect($generation->refresh()->status)->toBe(GenerationStatus::Queued);

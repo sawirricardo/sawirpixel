@@ -9,6 +9,7 @@ use App\Exceptions\Pixelforge\InvalidWebhookSignatureException;
 use App\Services\Pixelforge\WebhookSignatureVerifier;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use JsonException;
 
 final class PixelforgeWebhookController
@@ -20,6 +21,12 @@ final class PixelforgeWebhookController
         try {
             $verifier->verify($payload, $request->header('Pixelforge-Signature'));
         } catch (InvalidWebhookSignatureException $invalidWebhookSignatureException) {
+            Log::warning('Rejected a Pixelforge webhook: '.$invalidWebhookSignatureException->getMessage(), [
+                'event_id' => $request->header('Pixelforge-Event-Id'),
+                'event_type' => $request->header('Pixelforge-Event-Type'),
+                'delivery_attempt' => $request->header('Pixelforge-Delivery-Attempt'),
+            ]);
+
             return response()->json(['error' => $invalidWebhookSignatureException->getMessage()], 400);
         }
 
