@@ -19,6 +19,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Application Description
+    |--------------------------------------------------------------------------
+    |
+    | Used for search results and link previews (meta description, Open Graph
+    | and Twitter cards).
+    |
+    */
+
+    'description' => env('APP_DESCRIPTION', 'Turn a prompt into an image. See the price before you generate, pay only what each image actually costs, and nothing if it fails.'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Environment
     |--------------------------------------------------------------------------
     |

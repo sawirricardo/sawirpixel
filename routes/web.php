@@ -25,11 +25,16 @@ use App\Http\Controllers\MemberController;
 use App\Http\Controllers\OrganizationController;
 use App\Http\Controllers\OrganizationSettingsController;
 use App\Http\Controllers\PixelforgeWebhookController;
+use App\Http\Controllers\RobotsController;
 use App\Http\Controllers\Settings\PasswordController;
 use App\Http\Controllers\Settings\ProfileController;
+use App\Http\Controllers\SitemapController;
+use App\Http\Middleware\NoIndex;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', HomeController::class)->name('home');
+Route::get('/robots.txt', RobotsController::class)->name('robots');
+Route::get('/sitemap.xml', SitemapController::class)->name('sitemap');
 
 Route::post('/generations/estimate', GenerationEstimateController::class)
     ->middleware('throttle:60,1')
@@ -37,7 +42,7 @@ Route::post('/generations/estimate', GenerationEstimateController::class)
 
 Route::post('/webhooks/pixelforge', PixelforgeWebhookController::class)->name('webhooks.pixelforge');
 
-Route::get('/invitations/{token}', [InvitationAcceptanceController::class, 'show'])->name('invitations.show');
+Route::get('/invitations/{token}', [InvitationAcceptanceController::class, 'show'])->middleware(NoIndex::class)->name('invitations.show');
 Route::post('/invitations/{token}', [InvitationAcceptanceController::class, 'store'])
     ->middleware(['auth', 'verified', 'throttle:10,1'])
     ->name('invitations.accept');
@@ -50,11 +55,11 @@ Route::middleware('guest')->group(function (): void {
 
     Route::get('/forgot-password', [PasswordResetLinkController::class, 'create'])->name('password.request');
     Route::post('/forgot-password', [PasswordResetLinkController::class, 'store'])->middleware('throttle:6,1')->name('password.email');
-    Route::get('/reset-password/{token}', [NewPasswordController::class, 'create'])->name('password.reset');
+    Route::get('/reset-password/{token}', [NewPasswordController::class, 'create'])->middleware(NoIndex::class)->name('password.reset');
     Route::post('/reset-password', [NewPasswordController::class, 'store'])->middleware('throttle:6,1')->name('password.store');
 });
 
-Route::middleware('auth')->group(function (): void {
+Route::middleware(['auth', NoIndex::class])->group(function (): void {
     Route::post('/logout', [LoginController::class, 'destroy'])->name('logout');
 
     Route::get('/email/verify', EmailVerificationNoticeController::class)->name('verification.notice');
@@ -95,7 +100,7 @@ Route::middleware('auth')->group(function (): void {
  * lives here, on the group, so a new admin route can't forget it. Horizon is served at /admin/horizon
  * and enforces the same gate through Horizon::auth.
  */
-Route::prefix('admin')->name('admin.')->middleware(['auth', 'can:accessAdmin'])->group(function (): void {
+Route::prefix('admin')->name('admin.')->middleware(['auth', 'can:accessAdmin', NoIndex::class])->group(function (): void {
     Route::get('/reports/profit', [ProfitReportController::class, 'index'])->name('reports.profit');
     Route::get('/reports/profit/generations.csv', ProfitReportExportController::class)->name('reports.profit.export');
 
