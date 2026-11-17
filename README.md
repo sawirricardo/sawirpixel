@@ -7,6 +7,18 @@ nothing if it fails. Operators get a profit report reconciled against Pixelforge
 
 > **This is a demo.** Credit purchases are simulated; no real payments are taken.
 
+## Submission
+
+| | |
+|---|---|
+| **Live app** | https://sawirpixel.sawirstudio.com |
+| **Pixelforge account** | sawir.ricardo@gmail.com |
+| **Reviewer login** | shared privately with the submission (it can spend real Pixelforge credits) |
+
+The live app has its own Pixelforge key, used by nothing else, and a few generations made with it,
+so its numbers can be compared one-to-one with Pixelforge's records: each generation's charge with
+Pixelforge's usage for it, and the profit report (`/admin/reports/profit`) with `GET /v1/usage`.
+
 **Stack:** Laravel 13 · PHP 8.5 · Inertia v3 + Vue 3 (TypeScript) · Tailwind v4 · Redis + Horizon · Pest
 
 ---
@@ -163,6 +175,17 @@ can only be managed from a logged-in session, never with a token.
 | `POST /api/generations` | `generations:create` |
 | `GET /api/credits` | `credits:read` |
 
+### For agents
+
+- **MCP:** `/mcp` is a Model Context Protocol server (streamable HTTP) using the same tokens and scopes,
+  with the tools `estimate_price`, `generate_image`, `get_generation`, `list_generations` and
+  `get_credit_balance`. It's described at `/.well-known/mcp/server-card.json`.
+- **Discovery:** `/.well-known/api-catalog` (RFC 9727) points to the OpenAPI description at
+  `/docs/api.json`, and public pages send `Link` headers to it, the server card and the sitemap.
+- **Markdown:** the home page, terms and privacy policy answer `Accept: text/markdown` with Markdown,
+  from the same files (`resources/markdown`) the web pages render.
+- **robots.txt:** names the AI crawlers and sets Content Signals: `search=yes, ai-input=yes, ai-train=no`.
+
 ### Credits
 
 Each organization has a balance and an append-only ledger (`credit_transactions`): purchase, hold,
@@ -183,6 +206,8 @@ balance is only changed with the organization's row locked (`app/Services/Billin
 | Threads (continue and branch) | `app/Services/Generations/GenerationThread.php` |
 | Roles and permissions | `app/Models/Concerns/HasRoles.php`, `app/Enums/Permission.php`, `app/Policies/` |
 | API and tokens | `routes/api.php`, `app/Http/Controllers/Api/`, `app/Http/Resources/`, `app/Actions/IssuePersonalAccessToken.php` |
+| MCP server | `routes/ai.php`, `app/Mcp/` |
+| Deployment | `Dockerfile`, `docker-compose.yml`, `deploy.sh` |
 | Reporting | `app/Services/Reporting/` |
 | Front end | `resources/js/pages/`, `resources/js/lib/` |
 
@@ -203,7 +228,7 @@ The lifecycles that drive behaviour are explicit, each with its diagram in a doc
 ## Tests and quality gates
 
 ```bash
-php artisan test --compact      # 407 tests
+php artisan test --compact      # 435 tests, on SQLite; all pass on Postgres too
 composer test                   # everything below, then the suite
 composer test:types             # PHPStan (Larastan, level max)
 composer test:type-coverage     # 100% type coverage
