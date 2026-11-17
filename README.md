@@ -45,6 +45,18 @@ seconds, and a scheduled job re-checks anything stale every 5 minutes, so images
 To receive real webhooks, expose the app (for example `cloudflared tunnel --url http://localhost:8000`)
 and set `https://<tunnel>/webhooks/pixelforge` as the endpoint in Pixelforge's dashboard.
 
+#### Or with Docker
+
+`docker-compose.yml` runs the app, Horizon and the scheduler (`task`) from one image
+(`sawirstudio/sawirpixel:latest`, `linux/amd64`, built on `serversideup/php:8.5-fpm-nginx-alpine`), plus
+Redis. Settings come from `.env`; the compose file points the containers at Redis and keeps the SQLite
+database in a shared volume. The app container runs the migrations on start.
+
+```bash
+docker compose up -d --build   # then open http://localhost:8080
+docker compose exec app php artisan db:seed --force
+```
+
 ### 2. A 10-minute walkthrough
 
 Pixelforge's test directives make each scenario deterministic: put one at the start of a prompt.
