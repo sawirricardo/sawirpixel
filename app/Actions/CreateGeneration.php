@@ -37,7 +37,7 @@ final readonly class CreateGeneration
     /**
      * @param  list<string>  $referenceImages
      *
-     * @throws ValidationException when the parent can't be continued, a limit refuses it, or credits don't cover it
+     * @throws ValidationException when the parent can't be continued or a limit refuses it (422), or credits don't cover it (402)
      */
     public function handle(User $user, Organization $organization, string $prompt, ImageSize $size, ImageQuality $quality, array $referenceImages = [], ?int $parentId = null): Generation
     {
@@ -70,7 +70,7 @@ final readonly class CreateGeneration
                     Money::format($estimate->chargeMax, RoundingMode::Up),
                     $lockedOrganization->name,
                     Money::format($balance, RoundingMode::Down),
-                )]);
+                )])->status(402); // Payment Required: the API answers 402; the web shows it like any other error.
             }
 
             $generation = Generation::query()->create([

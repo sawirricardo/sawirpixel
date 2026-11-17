@@ -3,12 +3,15 @@
 declare(strict_types=1);
 
 use App\Actions\CreateOrganization;
+use App\Actions\IssuePersonalAccessToken;
 use App\Enums\DefaultRole;
+use App\Enums\TokenAbility;
 use App\Models\CreditTransaction;
 use App\Models\Organization;
 use App\Models\User;
 use App\Services\Billing\CreditLedger;
 use Brick\Math\BigDecimal;
+use Carbon\CarbonInterface;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
@@ -151,4 +154,17 @@ function expectBalanceMatchesLedger(Organization $organization): void
         ->reduce(fn (BigDecimal $total, mixed $amount): BigDecimal => $total->plus(BigDecimal::of(is_string($amount) ? $amount : '0')), BigDecimal::zero());
 
     expect(BigDecimal::of($organization->refresh()->credit_balance)->isEqualTo($sum))->toBeTrue();
+}
+
+/**
+ * A real personal access token for the user, in their current organization unless another is given,
+ * with the given scopes. Returns the plain-text secret to send as a bearer token.
+ *
+ * @param  list<TokenAbility>  $abilities
+ */
+function apiToken(User $user, array $abilities = [TokenAbility::GenerationsRead, TokenAbility::GenerationsCreate, TokenAbility::CreditsRead], ?Organization $organization = null, ?CarbonInterface $expiresAt = null): string
+{
+    $organization ??= $user->currentOrganization ?? throw new LogicException('The user has no current organization.');
+
+    return resolve(IssuePersonalAccessToken::class)->handle($user, $organization, 'Test token', $abilities, $expiresAt)['plainText'];
 }

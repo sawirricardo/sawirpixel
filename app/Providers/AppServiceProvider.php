@@ -94,7 +94,8 @@ final class AppServiceProvider extends ServiceProvider
 
         RateLimiter::for('pixelforge', fn (): Limit => Limit::perMinute(config()->integer('services.pixelforge.requests_per_minute')));
 
-        Gate::define('viewApiDocs', fn (User $user): bool => $user->isSuperAdmin());
+        // Anyone with an account can read the API docs: they're how token holders learn to use it.
+        Gate::define('viewApiDocs', fn (User $user): bool => true);
         Gate::define('accessAdmin', fn (User $user): bool => $user->isSuperAdmin());
 
         Horizon::auth(fn (Request $request): bool => Gate::check('accessAdmin', [$request->user()]));
